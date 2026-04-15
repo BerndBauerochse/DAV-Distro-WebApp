@@ -59,6 +59,14 @@ export interface RunUpdateEvent {
 
 export type WsEvent = ProgressEvent | RunUpdateEvent
 
+export interface FileEntry {
+  name: string
+  size: number
+  modified: number
+}
+
+export type FileCategory = 'zips' | 'toc' | 'pdf'
+
 export interface ActiveTransfer {
   run_id: string
   portal: string

@@ -29,6 +29,7 @@ services:
       - uploads:/app/uploads
       - ${SOURCE_DIR:-/data/source}:/data/source:ro
       - ${EXPORT_DIR:-/data/export}:/data/export
+      - ${STORAGE_DIR:-/opt/dav-storage}:/storage
     depends_on:
       db:
         condition: service_healthy

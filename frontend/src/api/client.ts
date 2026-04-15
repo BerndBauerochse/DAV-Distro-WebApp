@@ -1,4 +1,4 @@
-import type { DeliveryRun, DeliveryLog, Portal } from '../types'
+import type { DeliveryRun, DeliveryLog, Portal, FileEntry, FileCategory } from '../types'
 import { getStoredAuth } from '../hooks/useAuth'
 
 const BASE = '/api'
@@ -63,5 +63,23 @@ export const api = {
     form.append('portal', portal)
     if (file) form.append('metadata_file', file)
     return request('/runs', { method: 'POST', body: form })
+  },
+
+  listFiles(category: FileCategory): Promise<FileEntry[]> {
+    return request(`/files/${category}`)
+  },
+
+  async uploadFile(category: FileCategory, file: File): Promise<FileEntry> {
+    const form = new FormData()
+    form.append('file', file)
+    return request(`/files/${category}`, { method: 'POST', body: form })
+  },
+
+  deleteFile(category: FileCategory, filename: string): Promise<void> {
+    return request(`/files/${category}/${encodeURIComponent(filename)}`, { method: 'DELETE' })
+  },
+
+  getFileDownloadUrl(category: FileCategory, filename: string): string {
+    return `${BASE}/files/${category}/${encodeURIComponent(filename)}/download`
   },
 }

@@ -4,7 +4,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import runs, portals
+from app.routers import runs, portals, files as files_router
 from app.routers import auth as auth_router
 from app.websocket_manager import ws_manager
 from app.auth import JWT_SECRET, ALGORITHM
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(runs.router, prefix="/api")
 app.include_router(portals.router, prefix="/api")
+app.include_router(files_router.router, prefix="/api")
 
 
 @app.websocket("/ws")

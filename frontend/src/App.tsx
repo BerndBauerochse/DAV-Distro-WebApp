@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { LayoutDashboard, History as HistoryIcon, Package, LogOut, User } from 'lucide-react'
+import { LayoutDashboard, History as HistoryIcon, Package, LogOut, User, FolderOpen } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
+import { FileManager } from './components/FileManager'
 import { LoginPage } from './components/LoginPage'
 import { useAuth } from './hooks/useAuth'
 
@@ -13,7 +14,7 @@ const queryClient = new QueryClient({
   },
 })
 
-type Page = 'dashboard' | 'history'
+type Page = 'dashboard' | 'history' | 'files'
 
 export function App() {
   const { auth, login, logout } = useAuth()
@@ -50,6 +51,12 @@ export function App() {
                   icon={<HistoryIcon className="w-4 h-4" />}
                   label="Historie"
                 />
+                <NavButton
+                  active={page === 'files'}
+                  onClick={() => setPage('files')}
+                  icon={<FolderOpen className="w-4 h-4" />}
+                  label="Dateien"
+                />
               </nav>
 
               <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
@@ -71,6 +78,7 @@ export function App() {
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
           {page === 'dashboard' && <Dashboard />}
           {page === 'history' && <History />}
+          {page === 'files' && <FileManager />}
         </main>
       </div>
     </QueryClientProvider>
