@@ -22,7 +22,7 @@ services:
       CONFIG_PATH: /app/config/portals.ini
       UPLOAD_DIR: /app/uploads
     volumes:
-      - ./config:/app/config:ro         # portals.ini (credentials, nicht in Git)
+      - ./config:/app/config:ro
       - uploads:/app/uploads
       - ${SOURCE_DIR:-/data/source}:/data/source:ro
       - ${EXPORT_DIR:-/data/export}:/data/export
@@ -35,21 +35,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    networks:
-      - default
-      - coolify
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dav-distro.rule=Host(`distro.der-audio-verlag.de`)"
-      - "traefik.http.routers.dav-distro.entrypoints=https"
-      - "traefik.http.routers.dav-distro.tls=true"
-      - "traefik.http.routers.dav-distro.tls.certresolver=letsencrypt"
-      - "traefik.http.services.dav-distro.loadbalancer.server.port=80"
+    environment:
+      - SERVICE_FQDN_FRONTEND_80
 
 volumes:
   postgres_data:
   uploads:
-
-networks:
-  coolify:
-    external: true
