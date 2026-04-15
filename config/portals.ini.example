@@ -1,0 +1,106 @@
+# Kopiere diese Datei zu portals.ini und trage deine Zugangsdaten ein.
+# portals.ini wird NICHT in Git eingecheckt.
+
+[General]
+base_path = /app
+
+[Portal_Audible]
+type = sftp
+host = dar-eu.amazon-digital-ftp.com
+port = 22
+username = deftp_dave
+encrypted_password = HIER_BASE64_PASSWORT
+remote_path = /
+export_dir = /data/export/audible
+source_dir = /data/source
+
+[Portal_Audible_MoA]
+type = sftp
+host = dar-eu.amazon-digital-ftp.com
+port = 22
+username = deftp_dave
+encrypted_password = HIER_BASE64_PASSWORT
+remote_path = /metadata/
+export_dir = /data/export/audible
+
+[Portal_Audible_Fullfill]
+type = sftp
+host = dar-eu.amazon-digital-ftp.com
+port = 22
+username = deftp_dave
+encrypted_password = HIER_BASE64_PASSWORT
+remote_path = /
+export_dir = /data/export/audible
+source_dir = /data/source
+
+[Portal_Google]
+type = sftp
+zip_sftp_host = partnerupload.google.com
+zip_sftp_port = 19321
+zip_sftp_username = feeds-XXXXXXX
+zip_sftp_password_base64 = HIER_BASE64_PASSWORT
+xml_sftp_host = DEIN_XML_SERVER
+xml_sftp_port = 22
+xml_sftp_username = DEIN_USERNAME
+xml_sftp_password = DEIN_PASSWORT
+xml_remote_dir = /onix/DEIN_ORDNER
+export_dir = /data/export/google
+source_dir = /data/source
+
+[Portal_Bookwire]
+type = sftp
+sftp_host = ftp.bookwire.de
+sftp_port = 22
+sftp_username = DerAudioVerlag
+sftp_password_base64 = HIER_BASE64_PASSWORT
+remote_dir = /assets
+remote_dir_xml = /xml
+export_dir = /data/export/bookwire
+source_dir = /data/source
+
+[Portal_Zebra]
+type = sftp
+sftp_host = ftp.media-ems.com
+sftp_port = 2201
+sftp_username = DAV
+sftp_password_base64 = HIER_BASE64_PASSWORT
+remote_dir = /
+remote_metadata_dir = /Metadaten
+export_dir = /data/export/zebra
+source_dir = /data/source
+
+[Portal_RTL+]
+type = sftp
+sftp_host = ftp-audiobooks.now-plus-prod.aws-cbc.cloud
+sftp_port = 22
+sftp_username = dav
+sftp_password_base64 = HIER_BASE64_PASSWORT
+export_dir = /data/export/rtl
+source_dir = /data/source
+
+[Portal_Divibib]
+type = ftp
+ftp_host = supplier-delivery.onleihe.de
+ftp_port = 21
+ftp_username = dav
+ftp_password_base64 = HIER_BASE64_PASSWORT
+export_dir = /data/export/divibib
+source_dir = /data/source
+
+[Portal_Bookbeat]
+type = sftp
+sftp_host = sftp-upload.bookbeat.com
+sftp_port = 22
+sftp_username = prodbbsftp.deraudioverlag
+sftp_password_base64 = HIER_BASE64_PASSWORT
+export_dir = /data/export/bookbeat
+source_dir = /data/source
+
+[Portal_Spotify]
+type = sftp
+sftp_host = sftp.findaway.com
+sftp_port = 2222
+sftp_username = deraudioverlagdig
+sftp_password = DEIN_PASSWORT
+export_dir = /data/export/spotify
+source_dir = /data/source

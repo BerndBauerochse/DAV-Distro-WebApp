@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dav_distro
+      POSTGRES_USER: dav
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dav -d dav_distro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://dav:${DB_PASSWORD:-changeme}@db:5432/dav_distro
+      CONFIG_PATH: /app/config/portals.ini
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - ./config:/app/config:ro         # portals.ini (credentials, nicht in Git)
+      - uploads:/app/uploads
+      - ${SOURCE_DIR:-/data/source}:/data/source:ro
+      - ${EXPORT_DIR:-/data/export}:/data/export
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  uploads:
