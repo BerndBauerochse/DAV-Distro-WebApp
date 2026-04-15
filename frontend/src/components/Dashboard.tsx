@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity } from 'lucide-react'
 import { ActiveRunCard } from './ActiveRunCard'
@@ -18,14 +18,17 @@ export function Dashboard() {
   })
 
   // Fetch currently running runs on mount
-  useQuery({
+  const { data: initialRuns } = useQuery({
     queryKey: ['active-runs'],
     queryFn: () => api.getRuns(undefined, 20, 0),
-    onSuccess: (runs: DeliveryRun[]) => {
-      const running = runs.filter(r => r.status === 'running')
-      setActiveRuns(new Map(running.map(r => [r.id, r])))
-    },
   })
+
+  useEffect(() => {
+    if (initialRuns) {
+      const running = initialRuns.filter(r => r.status === 'running')
+      setActiveRuns(new Map(running.map(r => [r.id, r])))
+    }
+  }, [initialRuns])
 
   const handleWsEvent = useCallback((event: WsEvent) => {
     if (event.type === 'run_update') {
