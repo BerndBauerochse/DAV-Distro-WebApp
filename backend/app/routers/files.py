@@ -12,9 +12,10 @@ from app.auth import get_current_user
 STORAGE_ROOT = Path(os.getenv("STORAGE_DIR", "/storage"))
 
 CATEGORIES = {
-    "zips": STORAGE_ROOT / "zips",
-    "toc":  STORAGE_ROOT / "toc",
-    "pdf":  STORAGE_ROOT / "pdf",
+    "zips":   STORAGE_ROOT / "zips",
+    "toc":    STORAGE_ROOT / "toc",
+    "pdf":    STORAGE_ROOT / "pdf",
+    "covers": STORAGE_ROOT / "covers",
 }
 
 router = APIRouter(prefix="/files", tags=["files"])

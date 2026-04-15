@@ -65,7 +65,7 @@ export interface FileEntry {
   modified: number
 }
 
-export type FileCategory = 'zips' | 'toc' | 'pdf'
+export type FileCategory = 'zips' | 'toc' | 'pdf' | 'covers'
 
 export interface ActiveTransfer {
   run_id: string

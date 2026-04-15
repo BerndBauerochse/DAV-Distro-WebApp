@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Trash2, Download, FileArchive, FileText, File, Loader2, AlertCircle } from 'lucide-react'
+import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Loader2, AlertCircle } from 'lucide-react'
 import { api } from '../api/client'
 import type { FileCategory, FileEntry } from '../types'
 
@@ -25,6 +25,13 @@ const CATEGORIES: { key: FileCategory; label: string; icon: React.ReactNode; acc
     icon: <File className="w-4 h-4" />,
     accept: '.pdf',
     desc: 'Booklets & Beilagen',
+  },
+  {
+    key: 'covers',
+    label: 'Cover',
+    icon: <Image className="w-4 h-4" />,
+    accept: '.jpg,.jpeg,.png',
+    desc: 'Cover-Bilder (Audible MoA & andere)',
   },
 ]
 
