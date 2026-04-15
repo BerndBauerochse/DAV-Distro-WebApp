@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react'
 import type { WsEvent } from '../types'
+import { getStoredAuth } from './useAuth'
 
 type Handler = (event: WsEvent) => void
 
@@ -9,8 +10,11 @@ export function useWebSocket(onMessage: Handler) {
   handlerRef.current = onMessage
 
   const connect = useCallback(() => {
+    const { token } = getStoredAuth()
+    if (!token) return
+
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const url = `${protocol}://${window.location.host}/ws`
+    const url = `${protocol}://${window.location.host}/ws?token=${encodeURIComponent(token)}`
     const ws = new WebSocket(url)
 
     ws.onmessage = (e) => {

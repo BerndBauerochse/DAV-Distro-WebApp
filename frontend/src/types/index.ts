@@ -2,6 +2,7 @@ export interface DeliveryRun {
   id: string
   portal: string
   metadata_filename: string | null
+  initiated_by: string | null
   status: 'running' | 'completed' | 'failed' | 'cancelled'
   total_files: number
   completed_files: number

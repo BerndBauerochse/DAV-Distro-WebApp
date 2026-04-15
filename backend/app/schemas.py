@@ -53,6 +53,7 @@ class DeliveryRunOut(BaseModel):
     id: uuid.UUID
     portal: str
     metadata_filename: str | None
+    initiated_by: str | None
     status: str
     total_files: int
     completed_files: int

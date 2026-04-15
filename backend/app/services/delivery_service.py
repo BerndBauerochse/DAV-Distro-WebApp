@@ -56,6 +56,7 @@ async def start_delivery_run(
     portal_key: str,
     metadata_filename: str | None,
     metadata_path: str | None,
+    initiated_by: str | None = None,
 ) -> uuid.UUID:
     """
     Creates a DeliveryRun record and starts the delivery in a background thread.
@@ -68,6 +69,7 @@ async def start_delivery_run(
             id=run_id,
             portal=portal_key,
             metadata_filename=metadata_filename,
+            initiated_by=initiated_by,
             status="running",
         )
         db.add(run)

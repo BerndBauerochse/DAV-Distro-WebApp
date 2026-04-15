@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { LayoutDashboard, History as HistoryIcon, Package } from 'lucide-react'
+import { LayoutDashboard, History as HistoryIcon, Package, LogOut, User } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
+import { LoginPage } from './components/LoginPage'
+import { useAuth } from './hooks/useAuth'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,7 +16,12 @@ const queryClient = new QueryClient({
 type Page = 'dashboard' | 'history'
 
 export function App() {
+  const { auth, login, logout } = useAuth()
   const [page, setPage] = useState<Page>('dashboard')
+
+  if (!auth.token) {
+    return <LoginPage onLogin={login} />
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -29,20 +36,34 @@ export function App() {
               <span className="text-xs text-gray-400">Audio Distribution</span>
             </div>
 
-            <nav className="flex items-center gap-1">
-              <NavButton
-                active={page === 'dashboard'}
-                onClick={() => setPage('dashboard')}
-                icon={<LayoutDashboard className="w-4 h-4" />}
-                label="Dashboard"
-              />
-              <NavButton
-                active={page === 'history'}
-                onClick={() => setPage('history')}
-                icon={<HistoryIcon className="w-4 h-4" />}
-                label="Historie"
-              />
-            </nav>
+            <div className="flex items-center gap-3">
+              <nav className="flex items-center gap-1">
+                <NavButton
+                  active={page === 'dashboard'}
+                  onClick={() => setPage('dashboard')}
+                  icon={<LayoutDashboard className="w-4 h-4" />}
+                  label="Dashboard"
+                />
+                <NavButton
+                  active={page === 'history'}
+                  onClick={() => setPage('history')}
+                  icon={<HistoryIcon className="w-4 h-4" />}
+                  label="Historie"
+                />
+              </nav>
+
+              <div className="flex items-center gap-2 pl-3 border-l border-gray-200">
+                <User className="w-4 h-4 text-gray-400" />
+                <span className="text-sm text-gray-600 capitalize">{auth.username}</span>
+                <button
+                  onClick={logout}
+                  title="Abmelden"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         </header>
 

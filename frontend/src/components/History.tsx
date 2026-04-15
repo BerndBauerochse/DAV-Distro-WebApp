@@ -77,6 +77,7 @@ export function History() {
                 <th className="px-4 py-3">Metadatei</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Dateien</th>
+                <th className="px-4 py-3">Benutzer</th>
                 <th className="px-4 py-3">Gestartet</th>
                 <th className="px-4 py-3">Dauer</th>
               </tr>
@@ -133,6 +134,9 @@ function RunRow({ run, expanded, onToggle }: { run: DeliveryRun; expanded: boole
             <span className="text-red-500 ml-1">({run.failed_files} Fehler)</span>
           )}
         </td>
+        <td className="px-4 py-3 text-gray-500 capitalize">
+          {run.initiated_by ?? <span className="text-gray-300">—</span>}
+        </td>
         <td className="px-4 py-3 text-gray-500">
           {format(new Date(run.started_at), 'dd.MM.yy HH:mm', { locale: de })}
         </td>
@@ -141,7 +145,7 @@ function RunRow({ run, expanded, onToggle }: { run: DeliveryRun; expanded: boole
 
       {expanded && logs && (
         <tr>
-          <td colSpan={7} className="px-0 py-0 bg-gray-50 border-b border-gray-100">
+          <td colSpan={8} className="px-0 py-0 bg-gray-50 border-b border-gray-100">
             <LogTable logs={logs} />
           </td>
         </tr>

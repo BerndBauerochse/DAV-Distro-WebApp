@@ -21,6 +21,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://dav:${DB_PASSWORD:-changeme}@db:5432/dav_distro
       CONFIG_PATH: /app/config/portals.ini
       UPLOAD_DIR: /app/uploads
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      USER_BERND_PASSWORD: ${USER_BERND_PASSWORD:-Bx7@kP3mLw}
+      USER_DORO_PASSWORD: ${USER_DORO_PASSWORD:-Qn5!sJ7vYe}
     volumes:
       - ./config:/app/config:ro
       - uploads:/app/uploads

@@ -15,6 +15,7 @@ class DeliveryRun(Base):
     )
     portal: Mapped[str] = mapped_column(String, nullable=False, index=True)
     metadata_filename: Mapped[str | None] = mapped_column(String)
+    initiated_by: Mapped[str | None] = mapped_column(String)
     status: Mapped[str] = mapped_column(String, nullable=False, default="running")
     # running | completed | failed | cancelled
     total_files: Mapped[int] = mapped_column(Integer, default=0)

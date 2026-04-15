@@ -9,6 +9,7 @@ from app.database import get_db, AsyncSessionLocal
 from app.models import DeliveryRun, DeliveryLog
 from app.schemas import DeliveryRunOut, DeliveryRunDetail, DeliveryLogOut
 from app.services.delivery_service import start_delivery_run
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -21,6 +22,7 @@ async def list_runs(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
 ):
     q = select(DeliveryRun).order_by(desc(DeliveryRun.started_at)).limit(limit).offset(offset)
     if portal:
@@ -30,7 +32,7 @@ async def list_runs(
 
 
 @router.get("/{run_id}", response_model=DeliveryRunDetail)
-async def get_run(run_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_run(run_id: uuid.UUID, db: AsyncSession = Depends(get_db), _user: str = Depends(get_current_user)):
     run = await db.get(DeliveryRun, run_id)
     if not run:
         raise HTTPException(404, "Run not found")
@@ -46,6 +48,7 @@ async def get_run_logs(
     run_id: uuid.UUID,
     status: str | None = None,
     db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
 ):
     q = select(DeliveryLog).where(DeliveryLog.run_id == run_id).order_by(DeliveryLog.id)
     if status:
@@ -58,6 +61,7 @@ async def get_run_logs(
 async def start_run(
     portal: str = Form(...),
     metadata_file: UploadFile | None = File(default=None),
+    current_user: str = Depends(get_current_user),
 ):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     metadata_path = None
@@ -72,6 +76,6 @@ async def start_run(
         metadata_path = dest
 
     run_id = await start_delivery_run(
-        AsyncSessionLocal, portal, metadata_filename, metadata_path
+        AsyncSessionLocal, portal, metadata_filename, metadata_path, current_user
     )
     return {"run_id": str(run_id)}
