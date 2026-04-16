@@ -12,7 +12,7 @@ import zipfile
 from lxml import etree
 
 from app.modules.base import BasePortalModule, FileTransfer, ProgressCallback
-from app.modules.ftp_helper import sftp_connection, sftp_upload
+from app.modules.ftp_helper import ftps_connection, ftp_upload
 from app.services.delivery_service import register_portal
 
 logger = logging.getLogger(__name__)
@@ -89,19 +89,24 @@ class BookwireModule(BasePortalModule):
         return transfers
 
     def ship(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
-        with sftp_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as sftp:
+        import ftplib
+        with ftps_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as ftp:
             for t in transfers:
                 remote_dir = os.path.dirname(t.destination)
+                remote_filename = os.path.basename(t.destination)
+
+                # Navigate to target directory, create if missing
                 try:
-                    sftp.stat(remote_dir)
-                except FileNotFoundError:
-                    sftp.mkdir(remote_dir)
+                    ftp.cwd(remote_dir)
+                except ftplib.error_perm:
+                    ftp.mkd(remote_dir)
+                    ftp.cwd(remote_dir)
 
                 try:
                     progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
 
-                    sftp_upload(
-                        sftp, t.source_path, t.destination,
+                    ftp_upload(
+                        ftp, t.source_path, remote_filename,
                         progress_cb=lambda cur, tot: progress_cb(
                             run_id, t.ean, t.file_name, t.file_type, cur, tot, "uploading"
                         ),

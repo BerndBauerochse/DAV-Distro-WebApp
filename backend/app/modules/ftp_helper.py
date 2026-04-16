@@ -61,6 +61,22 @@ def ftp_connection(host: str, port: int, username: str, password: str):
             ftp.close()
 
 
+@contextmanager
+def ftps_connection(host: str, port: int, username: str, password: str):
+    """FTP with explicit TLS (FTPES) — same as FileZilla Protocol 4."""
+    ftp = ftplib.FTP_TLS()
+    ftp.connect(host, port)
+    ftp.login(username, password)
+    ftp.prot_p()  # encrypt the data channel
+    try:
+        yield ftp
+    finally:
+        try:
+            ftp.quit()
+        except Exception:
+            ftp.close()
+
+
 def ftp_upload(
     ftp: ftplib.FTP,
     local_path: str,
