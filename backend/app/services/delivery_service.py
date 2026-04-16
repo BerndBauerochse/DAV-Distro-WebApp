@@ -27,6 +27,7 @@ PORTAL_DISPLAY_NAMES = {
     "audible_moa": "Audible MoA",
     "audible_fulfill": "Audible Fulfill",
     "bookwire": "Bookwire",
+    "bookwire_moa": "Bookwire MoA",
     "bookbeat": "Bookbeat",
     "spotify": "Spotify",
     "google": "Google",

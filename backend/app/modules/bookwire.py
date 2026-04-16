@@ -139,3 +139,32 @@ class BookwireModule(BasePortalModule):
         if src != dest:
             import shutil
             shutil.copy2(src, dest)
+
+
+@register_portal("bookwire_moa")
+class BookwireMoAModule(BookwireModule):
+    """Bookwire MoA — nur XML-Metadaten hochladen, keine ZIPs."""
+
+    def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
+        os.makedirs(self.export_dir, exist_ok=True)
+
+        if metadata_path and os.path.isfile(metadata_path):
+            xml_path = metadata_path
+        else:
+            xml_files = glob.glob(os.path.join(self.export_dir, "*.xml"))
+            xml_path = xml_files[0] if xml_files else None
+
+        if not xml_path:
+            raise RuntimeError(
+                f"Keine XML-Metadatei gefunden. Bitte eine XML-Datei hochladen "
+                f"oder in '{self.export_dir}' ablegen."
+            )
+
+        return [FileTransfer(
+            ean=None,
+            file_name=os.path.basename(xml_path),
+            file_type="metadata",
+            source_path=xml_path,
+            destination=f"{self.remote_dir_xml}/{os.path.basename(xml_path)}",
+            file_size_bytes=os.path.getsize(xml_path),
+        )]

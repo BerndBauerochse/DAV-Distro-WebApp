@@ -9,6 +9,23 @@ interface Props {
   onStarted: (runId: string) => void
 }
 
+// Filename prefix → portal key (lowercase prefix before first '_')
+const PREFIX_TO_PORTAL: Record<string, string> = {
+  audible:  'audible',
+  bookbeat: 'bookbeat',
+  bookwire: 'bookwire',
+  divibib:  'divibib',
+  google:   'google',
+  rtl:      'rtl',
+  spotify:  'spotify',
+  zebra:    'zebra',
+}
+
+function detectPortal(filename: string): string | null {
+  const prefix = filename.toLowerCase().split('_')[0]
+  return PREFIX_TO_PORTAL[prefix] ?? null
+}
+
 export function StartDelivery({ portals, onStarted }: Props) {
   const [portal, setPortal] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -87,7 +104,16 @@ export function StartDelivery({ portals, onStarted }: Props) {
             type="file"
             accept=".xml,.xlsx,.xls"
             className="hidden"
-            onChange={e => setFile(e.target.files?.[0] ?? null)}
+            onChange={e => {
+              const f = e.target.files?.[0] ?? null
+              setFile(f)
+              if (f) {
+                const detected = detectPortal(f.name)
+                if (detected && portals.some(p => p.key === detected)) {
+                  setPortal(detected)
+                }
+              }
+            }}
           />
         </div>
 

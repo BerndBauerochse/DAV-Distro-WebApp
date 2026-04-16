@@ -23,6 +23,8 @@ class SpotifyModule(BasePortalModule):
         self.port = config.getint(sec, "sftp_port", fallback=2222)
         self.username = self._get(sec, "sftp_username", "deraudioverlagdig")
         self.password = self._get(sec, "sftp_password")
+        # Optional: rename XML on server (Findaway may require a fixed filename)
+        self.sftp_xml_filename = self._get(sec, "sftp_xml_filename", "")
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         os.makedirs(self.export_dir, exist_ok=True)
@@ -39,10 +41,11 @@ class SpotifyModule(BasePortalModule):
             logger.error("Spotify: No metadata file found.")
             return transfers
 
+        remote_name = self.sftp_xml_filename or os.path.basename(meta)
         transfers.append(FileTransfer(
             ean=None, file_name=os.path.basename(meta),
             file_type="metadata", source_path=meta,
-            destination=f"/{os.path.basename(meta)}",
+            destination=f"/{remote_name}",
             file_size_bytes=os.path.getsize(meta),
         ))
 
