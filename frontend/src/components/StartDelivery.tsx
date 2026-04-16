@@ -70,6 +70,7 @@ export function StartDelivery({ portals, onStarted }: Props) {
   }
 
   return (
+    <>
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
         <Play className="w-4 h-4 text-blue-600" />
@@ -197,5 +198,6 @@ export function StartDelivery({ portals, onStarted }: Props) {
         </div>
       </div>
     )}
+    </>
   )
 }
