@@ -53,20 +53,21 @@ interface CategoryPanelProps {
   category: typeof CATEGORIES[number]
 }
 
+interface UploadTask {
+  progress: number
+  error?: string
+}
+
 function CategoryPanel({ category }: CategoryPanelProps) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
+  const [uploads, setUploads] = useState<Record<string, UploadTask>>({})
 
   const { data: files = [], isLoading, isError } = useQuery({
     queryKey: ['files', category.key],
     queryFn: () => api.listFiles(category.key),
-  })
-
-  const uploadMutation = useMutation({
-    mutationFn: (file: File) => api.uploadFile(category.key, file),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['files', category.key] }),
   })
 
   const deleteMutation = useMutation({
@@ -79,8 +80,32 @@ function CategoryPanel({ category }: CategoryPanelProps) {
 
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return
-    Array.from(fileList).forEach(f => uploadMutation.mutate(f))
+    Array.from(fileList).forEach(file => {
+      setUploads(prev => ({ ...prev, [file.name]: { progress: 0 } }))
+      api.uploadFile(
+        category.key,
+        file,
+        (percent) => setUploads(prev => ({
+          ...prev,
+          [file.name]: { progress: percent },
+        })),
+      ).then(() => {
+        setUploads(prev => {
+          const next = { ...prev }
+          delete next[file.name]
+          return next
+        })
+        qc.invalidateQueries({ queryKey: ['files', category.key] })
+      }).catch((err: Error) => {
+        setUploads(prev => ({
+          ...prev,
+          [file.name]: { progress: 0, error: err.message },
+        }))
+      })
+    })
   }
+
+  const activeUploads = Object.entries(uploads)
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -112,26 +137,44 @@ function CategoryPanel({ category }: CategoryPanelProps) {
           className="hidden"
           onChange={e => handleFiles(e.target.files)}
         />
-        {uploadMutation.isPending ? (
-          <div className="flex items-center justify-center gap-2 text-blue-600">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm font-medium">Wird hochgeladen…</span>
-          </div>
-        ) : (
-          <>
-            <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm font-medium text-gray-600">
-              Dateien hierher ziehen oder klicken
-            </p>
-            <p className="text-xs text-gray-400 mt-1">{category.accept.replace(/\./g, '').toUpperCase()}</p>
-          </>
-        )}
+        <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+        <p className="text-sm font-medium text-gray-600">
+          Dateien hierher ziehen oder klicken
+        </p>
+        <p className="text-xs text-gray-400 mt-1">{category.accept.replace(/\./g, '').toUpperCase()}</p>
       </div>
 
-      {uploadMutation.isError && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 rounded-lg px-3 py-2 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          Upload fehlgeschlagen
+      {/* Upload Progress */}
+      {activeUploads.length > 0 && (
+        <div className="space-y-2 border border-blue-100 bg-blue-50/50 rounded-xl p-4">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
+            Upload läuft…
+          </p>
+          {activeUploads.map(([name, task]) => (
+            <div key={name} className="space-y-1">
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-sm text-gray-700 truncate">{name}</span>
+                {task.error ? (
+                  <span className="text-xs text-red-500 shrink-0 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> Fehler
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium text-blue-600 shrink-0 w-9 text-right">
+                    {task.progress}%
+                  </span>
+                )}
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className={`h-1.5 rounded-full transition-all duration-200 ${task.error ? 'bg-red-400' : 'bg-blue-500'}`}
+                  style={{ width: `${task.error ? 100 : task.progress}%` }}
+                />
+              </div>
+              {task.error && (
+                <p className="text-xs text-red-500">{task.error}</p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

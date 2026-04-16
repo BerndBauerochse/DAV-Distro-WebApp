@@ -2,12 +2,14 @@
 File Manager: list, upload, delete files in /storage/{zips,toc,pdf}
 """
 import os
-import shutil
+import aiofiles
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from app.auth import get_current_user
+
+CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 STORAGE_ROOT = Path(os.getenv("STORAGE_DIR", "/storage"))
 
@@ -62,8 +64,9 @@ async def upload_file(
 ):
     folder = _category_path(category)
     dest = folder / file.filename
-    with dest.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
+    async with aiofiles.open(dest, "wb") as out:
+        while chunk := await file.read(CHUNK_SIZE):
+            await out.write(chunk)
     stat = dest.stat()
     return FileEntry(name=dest.name, size=stat.st_size, modified=stat.st_mtime)
 
