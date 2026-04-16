@@ -143,10 +143,16 @@ class BookwireModule(BasePortalModule):
 
 @register_portal("bookwire_moa")
 class BookwireMoAModule(BookwireModule):
-    """Bookwire MoA — nur XML-Metadaten hochladen, keine ZIPs."""
+    """Bookwire MoA — XML-Metadaten + Cover-JPGs hochladen, keine ZIPs."""
+
+    def __init__(self, config, portal_name):
+        super().__init__(config, portal_name)
+        sec = "Portal_Bookwire_MoA"
+        self.covers_dir = self._get(sec, "covers_dir", "/storage/covers")
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         os.makedirs(self.export_dir, exist_ok=True)
+        transfers: list[FileTransfer] = []
 
         if metadata_path and os.path.isfile(metadata_path):
             xml_path = metadata_path
@@ -160,11 +166,31 @@ class BookwireMoAModule(BookwireModule):
                 f"oder in '{self.export_dir}' ablegen."
             )
 
-        return [FileTransfer(
+        transfers.append(FileTransfer(
             ean=None,
             file_name=os.path.basename(xml_path),
             file_type="metadata",
             source_path=xml_path,
             destination=f"{self.remote_dir_xml}/{os.path.basename(xml_path)}",
             file_size_bytes=os.path.getsize(xml_path),
-        )]
+        ))
+
+        # Cover-JPGs für alle EANs in der XML
+        eans = self._extract_eans(xml_path)
+        logger.info(f"Bookwire MoA: Found {len(eans)} EANs in XML")
+
+        for ean in eans:
+            jpg_path = os.path.join(self.covers_dir, f"{ean}.jpg")
+            if not os.path.isfile(jpg_path):
+                logger.warning(f"Bookwire MoA: Cover not found for EAN {ean}: {jpg_path}")
+                continue
+            transfers.append(FileTransfer(
+                ean=ean,
+                file_name=f"{ean}.jpg",
+                file_type="cover",
+                source_path=jpg_path,
+                destination=f"{self.remote_dir}/{ean}.jpg",
+                file_size_bytes=os.path.getsize(jpg_path),
+            ))
+
+        return transfers
