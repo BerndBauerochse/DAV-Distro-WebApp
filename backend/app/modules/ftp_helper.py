@@ -61,10 +61,26 @@ def ftp_connection(host: str, port: int, username: str, password: str):
             ftp.close()
 
 
+class _FTP_TLS_SessionReuse(ftplib.FTP_TLS):
+    """FTP_TLS subclass that reuses the control-channel TLS session on data
+    connections.  Required by servers that enforce RFC 4217 §17 (error 522)."""
+
+    def ntransfercmd(self, cmd, rest=None):
+        conn, size = ftplib.FTP.ntransfercmd(self, cmd, rest)
+        if self._prot_p:
+            conn = self.context.wrap_socket(
+                conn,
+                server_hostname=self.host,
+                session=self.sock.session,
+            )
+        return conn, size
+
+
 @contextmanager
 def ftps_connection(host: str, port: int, username: str, password: str):
-    """FTP with explicit TLS (FTPES) — same as FileZilla Protocol 4."""
-    ftp = ftplib.FTP_TLS()
+    """FTP with explicit TLS (FTPES) — same as FileZilla Protocol 4.
+    Uses TLS session resumption to satisfy servers that require it (522)."""
+    ftp = _FTP_TLS_SessionReuse()
     ftp.connect(host, port)
     ftp.login(username, password)
     ftp.prot_p()  # encrypt the data channel

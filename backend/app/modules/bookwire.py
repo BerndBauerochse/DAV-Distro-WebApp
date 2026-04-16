@@ -99,7 +99,10 @@ class BookwireModule(BasePortalModule):
                 try:
                     ftp.cwd(remote_dir)
                 except ftplib.error_perm:
-                    ftp.mkd(remote_dir)
+                    try:
+                        ftp.mkd(remote_dir)
+                    except ftplib.error_perm:
+                        pass  # directory already exists
                     ftp.cwd(remote_dir)
 
                 try:
