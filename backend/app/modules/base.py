@@ -53,5 +53,10 @@ class BasePortalModule(ABC):
         """Upload files to the portal. Call progress_cb for each file."""
         ...
 
+    def check_missing(self, metadata_path: str | None) -> list[str]:
+        """Return list of EANs whose ZIP files are missing in source_dir.
+        Override in modules that ship ZIP files."""
+        return []
+
     def _get(self, section: str, key: str, fallback: str = "") -> str:
         return self.config.get(section, key, fallback=fallback)

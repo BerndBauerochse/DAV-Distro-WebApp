@@ -76,6 +76,15 @@ class DivibibModule(BasePortalModule):
                     logger.error(f"Divibib upload failed {t.file_name}: {e}")
                     progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
 
+    def check_missing(self, metadata_path: str | None) -> list[str]:
+        if not metadata_path or not os.path.isfile(metadata_path):
+            return []
+        try:
+            eans = self._extract_eans(metadata_path)
+        except Exception:
+            return []
+        return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
+
     def _extract_eans(self, xml_path: str) -> list[str]:
         try:
             from lxml import etree

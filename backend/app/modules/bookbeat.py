@@ -48,16 +48,7 @@ class BookbeatModule(BasePortalModule):
             file_size_bytes=os.path.getsize(xml_path),
         ))
 
-        from lxml import etree
-        try:
-            with open(xml_path, "rb") as f:
-                tree = etree.parse(f)
-            ns = {"ns": "http://ns.editeur.org/onix/3.0/reference"}
-            nodes = tree.xpath('//ns:Product/ns:ProductIdentifier[ns:ProductIDType="15"]/ns:IDValue', namespaces=ns)
-            eans = [n.text for n in nodes if n.text]
-        except Exception as e:
-            logger.error(f"Bookbeat XML parse error: {e}")
-            eans = []
+        eans = self._extract_eans(xml_path)
 
         for ean in eans:
             src = os.path.join(self.source_dir, f"{ean}.zip")
@@ -87,3 +78,24 @@ class BookbeatModule(BasePortalModule):
                 except Exception as e:
                     logger.error(f"Bookbeat upload failed {t.file_name}: {e}")
                     progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+
+    def check_missing(self, metadata_path: str | None) -> list[str]:
+        if not metadata_path or not os.path.isfile(metadata_path):
+            return []
+        try:
+            eans = self._extract_eans(metadata_path)
+        except Exception:
+            return []
+        return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
+
+    def _extract_eans(self, xml_path: str) -> list[str]:
+        from lxml import etree
+        try:
+            with open(xml_path, "rb") as f:
+                tree = etree.parse(f)
+            ns = {"ns": "http://ns.editeur.org/onix/3.0/reference"}
+            nodes = tree.xpath('//ns:Product/ns:ProductIdentifier[ns:ProductIDType="15"]/ns:IDValue', namespaces=ns)
+            return [n.text for n in nodes if n.text]
+        except Exception as e:
+            logger.error(f"Bookbeat XML parse error: {e}")
+            return []

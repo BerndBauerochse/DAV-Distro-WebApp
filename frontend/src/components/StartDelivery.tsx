@@ -31,11 +31,10 @@ export function StartDelivery({ portals, onStarted }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [missingEans, setMissingEans] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!portal) return
+  const doStart = async () => {
     setLoading(true)
     setError(null)
     try {
@@ -43,12 +42,31 @@ export function StartDelivery({ portals, onStarted }: Props) {
       onStarted(result.run_id)
       setPortal('')
       setFile(null)
+      setMissingEans([])
       if (fileRef.current) fileRef.current.value = ''
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!portal) return
+    setLoading(true)
+    setError(null)
+    try {
+      const { missing } = await api.checkRun(portal, file ?? undefined)
+      if (missing.length > 0) {
+        setMissingEans(missing)
+        setLoading(false)
+        return
+      }
+    } catch {
+      // check failed → proceed anyway
+    }
+    await doStart()
   }
 
   return (
@@ -145,5 +163,39 @@ export function StartDelivery({ portals, onStarted }: Props) {
         </button>
       </form>
     </div>
+
+    {/* Missing ZIPs warning dialog */}
+    {missingEans.length > 0 && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
+          <h3 className="font-semibold text-gray-900 mb-2">Fehlende Audiodateien</h3>
+          <p className="text-sm text-gray-600 mb-3">
+            Für {missingEans.length === 1 ? 'folgenden Titel' : `folgende ${missingEans.length} Titel`} ist keine ZIP-Datei auf dem Server vorhanden:
+          </p>
+          <ul className="max-h-48 overflow-y-auto mb-4 space-y-1">
+            {missingEans.map(ean => (
+              <li key={ean} className="font-mono text-sm bg-red-50 text-red-700 px-3 py-1 rounded">{ean}</li>
+            ))}
+          </ul>
+          <p className="text-sm text-gray-500 mb-4">
+            Mit "Ignorieren" wird nur das übertragen, was vorhanden ist.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={() => setMissingEans([])}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Abbrechen
+            </button>
+            <button
+              onClick={doStart}
+              className="px-4 py-2 text-sm rounded-lg bg-orange-500 text-white hover:bg-orange-600 font-medium"
+            >
+              Ignorieren &amp; starten
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   )
 }

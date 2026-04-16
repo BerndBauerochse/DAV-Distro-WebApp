@@ -134,6 +134,15 @@ class BookwireModule(BasePortalModule):
         except Exception as e:
             raise RuntimeError(f"XML-Parsefehler in '{xml_path}': {e}") from e
 
+    def check_missing(self, metadata_path: str | None) -> list[str]:
+        if not metadata_path or not os.path.isfile(metadata_path):
+            return []
+        try:
+            eans = self._extract_eans(metadata_path)
+        except Exception:
+            return []
+        return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
+
     def _prepare_zip(self, src: str, dest: str, ean: str) -> None:
         """Copy ZIP to export dir. Could be extended for transformations."""
         if src != dest:

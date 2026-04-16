@@ -8,7 +8,7 @@ from sqlalchemy import select, desc
 from app.database import get_db, AsyncSessionLocal
 from app.models import DeliveryRun, DeliveryLog
 from app.schemas import DeliveryRunOut, DeliveryRunDetail, DeliveryLogOut
-from app.services.delivery_service import start_delivery_run
+from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -55,6 +55,44 @@ async def get_run_logs(
         q = q.where(DeliveryLog.status == status)
     result = await db.execute(q)
     return result.scalars().all()
+
+
+@router.post("/check")
+async def check_run(
+    portal: str = Form(...),
+    metadata_file: UploadFile | None = File(default=None),
+    _user: str = Depends(get_current_user),
+):
+    """Pre-flight check: returns EANs whose ZIP files are missing in source_dir."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    module_cls = PORTAL_REGISTRY.get(portal)
+    if not module_cls:
+        return {"missing": []}
+
+    config = load_config()
+    module = module_cls(config, portal)
+
+    temp_path = None
+    if metadata_file and metadata_file.filename:
+        suffix = _Path(metadata_file.filename).suffix or ".xml"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
+            f.write(await metadata_file.read())
+            temp_path = f.name
+
+    try:
+        missing = module.check_missing(temp_path)
+    except Exception:
+        missing = []
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+
+    return {"missing": missing}
 
 
 @router.post("", status_code=202)

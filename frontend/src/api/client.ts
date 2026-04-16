@@ -58,6 +58,13 @@ export const api = {
     return request('/portals')
   },
 
+  async checkRun(portal: string, file?: File): Promise<{ missing: string[] }> {
+    const form = new FormData()
+    form.append('portal', portal)
+    if (file) form.append('metadata_file', file)
+    return request('/runs/check', { method: 'POST', body: form })
+  },
+
   async startRun(portal: string, file?: File): Promise<{ run_id: string }> {
     const form = new FormData()
     form.append('portal', portal)
