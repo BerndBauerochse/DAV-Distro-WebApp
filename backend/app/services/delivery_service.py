@@ -106,21 +106,33 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
     """Blocking delivery execution — runs in thread pool."""
     config = load_config()
     module_cls = PORTAL_REGISTRY.get(portal_key)
+    error_message: str | None = None
 
     if module_cls is None:
-        logger.error(f"No module registered for portal: {portal_key}")
+        error_message = f"Kein Modul für Portal '{portal_key}' registriert."
+        logger.error(error_message)
         asyncio.run_coroutine_threadsafe(
-            _finalize_run(db_session_factory, run_id, portal_key, "failed"), loop
+            _record_system_error(db_session_factory, run_id, portal_key, error_message), loop
+        ).result()
+        asyncio.run_coroutine_threadsafe(
+            _finalize_run(db_session_factory, run_id, portal_key, "failed",
+                          error_message=error_message), loop
         ).result()
         return
 
     module = module_cls(config, portal_key)
     log_records: list[dict] = []
     completed = failed = skipped = 0
+    total = 0
 
     try:
         transfers = module.get_files(str(run_id), metadata_path)
         total = len(transfers)
+
+        if total == 0:
+            raise RuntimeError(
+                "Keine Dateien gefunden. Bitte XML-Datei und Quellverzeichnis prüfen."
+            )
 
         # Update total_files
         asyncio.run_coroutine_threadsafe(
@@ -217,14 +229,44 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
         final_status = "failed" if failed == total and total > 0 else "completed"
 
     except Exception as e:
+        error_message = str(e)
         logger.exception(f"Delivery run {run_id} crashed: {e}")
         final_status = "failed"
 
+        # Flush any accumulated log records first
+        if log_records:
+            asyncio.run_coroutine_threadsafe(
+                _insert_logs(db_session_factory, log_records), loop
+            ).result()
+            log_records.clear()
+
+        # Store error as a system log entry so it's visible in the History
+        asyncio.run_coroutine_threadsafe(
+            _record_system_error(db_session_factory, run_id, portal_key, error_message), loop
+        ).result()
+
     asyncio.run_coroutine_threadsafe(
         _finalize_run(db_session_factory, run_id, portal_key, final_status,
-                      total if 'total' in dir() else 0, completed, failed, skipped),
+                      total, completed, failed, skipped, error_message),
         loop,
     ).result()
+
+
+async def _record_system_error(db_session_factory, run_id, portal_key, error_message: str):
+    """Creates a special log entry to surface run-level errors in the History view."""
+    await _insert_logs(db_session_factory, [{
+        "run_id": run_id,
+        "portal": portal_key,
+        "ean": None,
+        "file_type": "system",
+        "file_name": "Systemfehler",
+        "source_path": None,
+        "destination": None,
+        "file_size_bytes": None,
+        "status": "failed",
+        "error_log": error_message,
+        "finished_at": datetime.now(timezone.utc),
+    }])
 
 
 async def _insert_logs(db_session_factory, records: list[dict]):
@@ -254,7 +296,7 @@ async def _update_run_counts(db_session_factory, run_id, total, completed, faile
 
 async def _finalize_run(
     db_session_factory, run_id, portal_key, status,
-    total=0, completed=0, failed=0, skipped=0
+    total=0, completed=0, failed=0, skipped=0, error_message=None,
 ):
     async with db_session_factory() as db:
         await db.execute(
@@ -271,7 +313,7 @@ async def _finalize_run(
         )
         await db.commit()
 
-    await ws_manager.broadcast({
+    msg = {
         "type": "run_update",
         "run_id": str(run_id),
         "portal": portal_key,
@@ -280,4 +322,8 @@ async def _finalize_run(
         "completed_files": completed,
         "failed_files": failed,
         "skipped_files": skipped,
-    })
+    }
+    if error_message:
+        msg["error"] = error_message
+
+    await ws_manager.broadcast(msg)

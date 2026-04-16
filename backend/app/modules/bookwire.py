@@ -49,8 +49,10 @@ class BookwireModule(BasePortalModule):
             xml_path = xml_files[0] if xml_files else None
 
         if not xml_path:
-            logger.error("Bookwire: No XML metadata file found.")
-            return transfers
+            raise RuntimeError(
+                f"Keine XML-Metadatei gefunden. Bitte eine XML-Datei hochladen "
+                f"oder in '{self.export_dir}' ablegen."
+            )
 
         transfers.append(FileTransfer(
             ean=None,
@@ -122,8 +124,7 @@ class BookwireModule(BasePortalModule):
             )
             return [n.text for n in nodes if n.text]
         except Exception as e:
-            logger.error(f"Bookwire: XML parse error: {e}")
-            return []
+            raise RuntimeError(f"XML-Parsefehler in '{xml_path}': {e}") from e
 
     def _prepare_zip(self, src: str, dest: str, ean: str) -> None:
         """Copy ZIP to export dir. Could be extended for transformations."""

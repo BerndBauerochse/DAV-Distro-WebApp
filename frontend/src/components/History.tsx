@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Search, FileArchive, FileText, AlertCircle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Search, FileArchive, FileText, AlertCircle, Settings } from 'lucide-react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { StatusBadge } from './StatusBadge'
@@ -181,6 +181,8 @@ function LogTable({ logs }: { logs: DeliveryLog[] }) {
                 <div className="flex items-center gap-1">
                   {log.file_type === 'metadata'
                     ? <FileText className="w-3 h-3 text-purple-400 shrink-0" />
+                    : log.file_type === 'system'
+                    ? <Settings className="w-3 h-3 text-orange-400 shrink-0" />
                     : <FileArchive className="w-3 h-3 text-blue-400 shrink-0" />
                   }
                   <span className="truncate text-gray-700">{log.file_name ?? '—'}</span>
