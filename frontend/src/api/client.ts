@@ -89,4 +89,19 @@ export const api = {
   getFileDownloadUrl(category: FileCategory, filename: string): string {
     return `${BASE}/files/${category}/${encodeURIComponent(filename)}/download`
   },
+
+  async downloadWithAuth(url: string, filename: string): Promise<void> {
+    const { token } = getStoredAuth()
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error(`Download fehlgeschlagen: ${res.status}`)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+  },
 }

@@ -22,6 +22,14 @@ logger = logging.getLogger(__name__)
 # Registry: portal_key -> module class
 PORTAL_REGISTRY: dict[str, type] = {}
 
+# In-memory cache: run_id (str) → local metadata file path
+# Used by the download endpoint so the user can save the attachment.
+_run_metadata_paths: dict[str, str] = {}
+
+
+def get_metadata_path(run_id: str) -> str | None:
+    return _run_metadata_paths.get(run_id)
+
 PORTAL_DISPLAY_NAMES = {
     "audible": "Audible",
     "audible_moa": "Audible MoA",
@@ -105,6 +113,9 @@ async def start_delivery_run(
 
 def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_path):
     """Blocking delivery execution — runs in thread pool."""
+    # Cache metadata path so the download endpoint can serve it
+    if metadata_path:
+        _run_metadata_paths[str(run_id)] = metadata_path
     config = load_config()
     module_cls = PORTAL_REGISTRY.get(portal_key)
     error_message: str | None = None
@@ -253,6 +264,13 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             mail_draft = module.get_mail_draft()
         except Exception:
             pass
+
+    # Inject attachment info if the module requested it and metadata is available
+    if mail_draft and mail_draft.pop("has_attachment", False) and metadata_path:
+        mail_draft["attachment"] = {
+            "filename": os.path.basename(metadata_path),
+            "download_url": f"/api/runs/{run_id}/metadata/download",
+        }
 
     asyncio.run_coroutine_threadsafe(
         _finalize_run(db_session_factory, run_id, portal_key, final_status,

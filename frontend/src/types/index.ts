@@ -71,6 +71,7 @@ export interface MailDraft {
   subject: string
   body: string
   is_html?: boolean
+  attachment?: { filename: string; download_url: string }
 }
 
 export interface RunUpdateEvent {

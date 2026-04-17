@@ -2,13 +2,14 @@ import os
 import uuid
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 
 from app.database import get_db, AsyncSessionLocal
 from app.models import DeliveryRun, DeliveryLog
 from app.schemas import DeliveryRunOut, DeliveryRunDetail, DeliveryLogOut
-from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY
+from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY, get_metadata_path
 from app.modules.metadata_parser import parse_metadata
 from app.auth import get_current_user
 
@@ -165,3 +166,15 @@ async def start_run(
         AsyncSessionLocal, portal, metadata_filename, metadata_path, current_user
     )
     return {"run_id": str(run_id)}
+
+
+@router.get("/{run_id}/metadata/download")
+async def download_run_metadata(
+    run_id: uuid.UUID,
+    _user: str = Depends(get_current_user),
+):
+    """Serve the uploaded metadata file for a run (used as mail attachment)."""
+    path = get_metadata_path(str(run_id))
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Metadatei nicht (mehr) verfügbar")
+    return FileResponse(path=path, filename=os.path.basename(path))

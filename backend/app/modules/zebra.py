@@ -217,4 +217,5 @@ class ZebraModule(BasePortalModule):
             "to": "content-operations-audiobook@zebralution.com; mara.hartung@zebralution.com",
             "subject": f"DAV {heute}",
             "body": body,
+            "has_attachment": True,  # delivery_service will inject attachment download URL
         }

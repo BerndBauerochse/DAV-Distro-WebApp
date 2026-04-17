@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Mail, X, Copy, Check } from 'lucide-react'
+import { Mail, X, Copy, Check, Paperclip, Download } from 'lucide-react'
+import { api } from '../api/client'
 import type { MailDraft } from '../types'
 
 interface Props {
@@ -10,11 +11,24 @@ interface Props {
 
 export function MailDraftModal({ draft, portalName, onClose }: Props) {
   const [copied, setCopied] = useState<'to' | 'subject' | 'body' | null>(null)
+  const [downloading, setDownloading] = useState(false)
 
   const copy = (field: 'to' | 'subject' | 'body', value: string) => {
     navigator.clipboard.writeText(value)
     setCopied(field)
     setTimeout(() => setCopied(null), 2000)
+  }
+
+  const downloadAttachment = async () => {
+    if (!draft.attachment) return
+    setDownloading(true)
+    try {
+      await api.downloadWithAuth(draft.attachment.download_url, draft.attachment.filename)
+    } catch (e) {
+      console.error('Anhang-Download fehlgeschlagen', e)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
@@ -91,6 +105,26 @@ export function MailDraftModal({ draft, portalName, onClose }: Props) {
             </div>
           </div>
         </div>
+
+        {/* Attachment */}
+        {draft.attachment && (
+          <div className="px-6 pb-4">
+            <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Anhang</label>
+            <div className="mt-1 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <Paperclip className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="flex-1 text-sm text-gray-700 truncate">{draft.attachment.filename}</span>
+              <button
+                onClick={downloadAttachment}
+                disabled={downloading}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-xs font-medium transition-colors shrink-0"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {downloading ? 'Lädt…' : 'Herunterladen'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Datei herunterladen und manuell als Anhang in Outlook hinzufügen</p>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
