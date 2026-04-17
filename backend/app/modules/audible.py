@@ -240,43 +240,95 @@ class AudibleModule(BasePortalModule):
 
 @register_portal("audible_moa")
 class AudibleMoAModule(BasePortalModule):
-    """Audible MoA (Meldung ohne Audio) — nur Metadatei hochladen."""
+    """
+    Audible MoA (Meldung ohne Audio).
+    - Excel-Metadatei → /metadata/{filename}
+    - Cover ({ean}.jpg) aus STORAGE_DIR/covers → /{ean}/{ean}.jpg
+      (Ordner /{ean}/ wird auf dem Server angelegt falls nicht vorhanden)
+    """
 
     def __init__(self, config, portal_name):
         super().__init__(config, portal_name)
         sec = "Portal_Audible_MoA"
-        self.export_dir = self._get(sec, "export_dir", "/data/export/audible")
         self.host = self._get(sec, "host", "dar-eu.amazon-digital-ftp.com")
         self.port = config.getint(sec, "port", fallback=22)
         self.username = self._get(sec, "username", "deftp_dave")
         self.password = _decode_password(config, sec)
-        self.remote_path = self._get(sec, "remote_path", "/metadata/")
+        self.metadata_remote = self._get(sec, "remote_path", "/metadata/")
+        self.covers_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "covers")
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         transfers: list[FileTransfer] = []
-        if metadata_path and os.path.isfile(metadata_path):
+
+        if not metadata_path or not os.path.isfile(metadata_path):
+            logger.warning("Audible MoA: Keine Metadatei angegeben.")
+            return transfers
+
+        # Excel → /metadata/
+        transfers.append(FileTransfer(
+            ean=None,
+            file_name=os.path.basename(metadata_path),
+            file_type="metadata",
+            source_path=metadata_path,
+            destination=f"{self.metadata_remote.rstrip('/')}/{os.path.basename(metadata_path)}",
+            file_size_bytes=os.path.getsize(metadata_path),
+        ))
+
+        # Cover je EAN → /{ean}/{ean}.jpg
+        eans = self._extract_eans_from_excel(metadata_path)
+        for ean in eans:
+            jpg_path = os.path.join(self.covers_dir, f"{ean}.jpg")
+            if not os.path.isfile(jpg_path):
+                logger.warning(f"Audible MoA: Cover nicht gefunden für {ean}: {jpg_path}")
+                continue
             transfers.append(FileTransfer(
-                ean=None,
-                file_name=os.path.basename(metadata_path),
-                file_type="metadata",
-                source_path=metadata_path,
-                destination=f"{self.remote_path}{os.path.basename(metadata_path)}",
-                file_size_bytes=os.path.getsize(metadata_path),
+                ean=ean,
+                file_name=f"{ean}.jpg",
+                file_type="cover",
+                source_path=jpg_path,
+                destination=f"/{ean}/{ean}.jpg",
+                file_size_bytes=os.path.getsize(jpg_path),
             ))
+
         return transfers
 
     def ship(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
         with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
             for t in transfers:
                 try:
+                    # Für Cover: Remote-Ordner /{ean}/ anlegen falls nicht vorhanden
+                    if t.file_type == "cover" and t.ean:
+                        remote_folder = f"/{t.ean}"
+                        try:
+                            sftp.stat(remote_folder)
+                        except IOError:
+                            sftp.mkdir(remote_folder)
+
                     progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
-                    sftp_upload(sftp, t.source_path, t.destination,
+                    sftp_upload(
+                        sftp, t.source_path, t.destination,
                         progress_cb=lambda cur, tot: progress_cb(
                             run_id, t.ean, t.file_name, t.file_type, cur, tot, "uploading"
-                        ))
+                        ),
+                    )
                     progress_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
                 except Exception as e:
+                    logger.error(f"Audible MoA: Upload fehlgeschlagen {t.file_name}: {e}")
                     progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+
+    def _extract_eans_from_excel(self, path: str) -> list[str]:
+        try:
+            df = pd.read_excel(path, dtype=str)
+            col = _AUDIBLE_ISBN_COL
+            if col in df.columns:
+                return df[col].dropna().tolist()
+            for fallback in ["EAN", "ISBN"]:
+                if fallback in df.columns:
+                    return df[fallback].dropna().tolist()
+            return []
+        except Exception as e:
+            logger.error(f"Audible MoA: Excel-Lesefehler: {e}")
+            return []
 
 
 @register_portal("audible_fulfill")
