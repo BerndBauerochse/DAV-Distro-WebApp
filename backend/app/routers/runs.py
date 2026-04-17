@@ -152,7 +152,10 @@ async def start_run(
 
     if metadata_file:
         metadata_filename = metadata_file.filename
-        dest = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{metadata_filename}")
+        # Store in a UUID subdirectory so os.path.basename() returns the original filename
+        upload_subdir = os.path.join(UPLOAD_DIR, str(uuid.uuid4()))
+        os.makedirs(upload_subdir, exist_ok=True)
+        dest = os.path.join(upload_subdir, metadata_filename)
         async with aiofiles.open(dest, "wb") as f:
             content = await metadata_file.read()
             await f.write(content)
