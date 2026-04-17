@@ -260,7 +260,8 @@ async def download_mail_eml(
     msg["Subject"] = draft.get("subject", "")
     msg["Date"]    = email.utils.formatdate(localtime=True)
     msg["MIME-Version"] = "1.0"
-    msg.set_content(draft.get("body", ""), subtype="html", charset="utf-8")
+    subtype = "html" if draft.get("is_html") else "plain"
+    msg.set_content(draft.get("body", ""), subtype=subtype, charset="utf-8")
 
     eml_bytes = bytes(msg)
     filename  = f"audible-{run_id}.eml"

@@ -182,25 +182,8 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             loop,
         )
 
-        # Build log records with pending status
-        for t in transfers:
-            log_records.append({
-                "run_id": run_id,
-                "portal": portal_key,
-                "ean": t.ean,
-                "file_type": t.file_type,
-                "file_name": t.file_name,
-                "source_path": t.source_path,
-                "destination": t.destination,
-                "file_size_bytes": t.file_size_bytes,
-                "status": "pending",
-            })
-
-        # Insert pending logs
-        asyncio.run_coroutine_threadsafe(
-            _insert_logs(db_session_factory, log_records), loop
-        ).result()
-        log_records.clear()
+        # Track which files have been started by progress_cb (to detect unprocessed ones)
+        processed_file_names: set[str] = set()
 
         def progress_cb(run_id, ean, file_name, file_type, current, total_bytes, status, error=None):
             nonlocal completed, failed, skipped
@@ -208,6 +191,8 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             if cancel_event.is_set():
                 raise InterruptedError("Auslieferung wurde abgebrochen")
 
+            if status in ("success", "failed", "skipped"):
+                processed_file_names.add(file_name)
             if status == "success":
                 completed += 1
             elif status == "failed":
@@ -260,6 +245,22 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             ).result()
             log_records.clear()
 
+        # Insert skipped entries for files that were never processed
+        now = datetime.now(timezone.utc)
+        for t in transfers:
+            if t.file_name not in processed_file_names:
+                skipped += 1
+                log_records.append({
+                    "run_id": run_id, "portal": portal_key, "ean": t.ean,
+                    "file_type": t.file_type, "file_name": t.file_name,
+                    "status": "skipped", "finished_at": now,
+                })
+        if log_records:
+            asyncio.run_coroutine_threadsafe(
+                _insert_logs(db_session_factory, log_records), loop
+            ).result()
+            log_records.clear()
+
         # If cancel was signalled but absorbed by parallel workers, honour it here
         if cancel_event.is_set():
             final_status = "cancelled"
@@ -270,6 +271,22 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
         error_message = str(e)
         logger.info(f"Delivery run {run_id} cancelled by user")
         final_status = "cancelled"
+        # Flush any partial log records
+        if log_records:
+            asyncio.run_coroutine_threadsafe(
+                _insert_logs(db_session_factory, log_records), loop
+            ).result()
+            log_records.clear()
+        # Insert skipped entries for files that were never processed
+        now = datetime.now(timezone.utc)
+        for t in transfers:
+            if t.file_name not in processed_file_names:
+                skipped += 1
+                log_records.append({
+                    "run_id": run_id, "portal": portal_key, "ean": t.ean,
+                    "file_type": t.file_type, "file_name": t.file_name,
+                    "status": "skipped", "finished_at": now,
+                })
         if log_records:
             asyncio.run_coroutine_threadsafe(
                 _insert_logs(db_session_factory, log_records), loop
@@ -296,15 +313,6 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
     finally:
         _cancel_events.pop(str(run_id), None)
 
-    # Fix any remaining 'pending' log entries → 'skipped'
-    try:
-        n_fixed = asyncio.run_coroutine_threadsafe(
-            _fixup_pending_logs(db_session_factory, run_id), loop
-        ).result()
-        skipped += n_fixed
-    except Exception:
-        pass
-
     # Collect mail draft if module supports it (only on success)
     mail_draft = None
     if final_status == "completed":
@@ -326,17 +334,6 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
         loop,
     ).result()
 
-
-async def _fixup_pending_logs(db_session_factory, run_id) -> int:
-    """Update any remaining 'pending' logs to 'skipped' after a run ends. Returns count updated."""
-    async with db_session_factory() as db:
-        result = await db.execute(
-            update(DeliveryLog)
-            .where(DeliveryLog.run_id == run_id, DeliveryLog.status == "pending")
-            .values(status="skipped", finished_at=datetime.now(timezone.utc))
-        )
-        await db.commit()
-        return result.rowcount
 
 
 async def _record_system_error(db_session_factory, run_id, portal_key, error_message: str):
