@@ -72,7 +72,7 @@ export function App() {
                     <img src="/logo.png" alt="DAV" className="w-7 h-7 object-contain" />
                   </div>
                   <div>
-                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em' }}>Distro</p>
+                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em' }}>Distro</p>
                     <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Audio Distribution</p>
                   </div>
                 </div>
@@ -97,7 +97,7 @@ export function App() {
                       onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-300)' }}
                     >
                       {item.icon}
-                      <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: active ? 600 : 500, fontSize: '0.875rem' }}>
+                      <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: active ? 600 : 500, fontSize: '0.875rem' }}>
                         {item.label}
                       </span>
                       {active && (
@@ -125,7 +125,7 @@ export function App() {
                         ? <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center"
                             style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
-                            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, color: 'white', fontSize: '0.875rem', textTransform: 'uppercase' }}>
+                            <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, color: 'white', fontSize: '0.875rem', textTransform: 'uppercase' }}>
                               {auth.username?.charAt(0) ?? '?'}
                             </span>
                           </div>
@@ -139,7 +139,7 @@ export function App() {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-100)', textTransform: 'capitalize' }} className="truncate">
+                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-100)', textTransform: 'capitalize' }} className="truncate">
                       {auth.username}
                     </p>
                     <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Benutzer</p>
@@ -162,7 +162,7 @@ export function App() {
                 {/* Page header */}
                 <div className="mb-7 fade-up">
                   <h1 style={{
-                    fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '1.625rem',
+                    fontFamily: 'DM Sans, sans-serif', fontWeight: 800, fontSize: '1.625rem',
                     letterSpacing: '-0.02em', color: 'var(--text-100)', lineHeight: 1.1
                   }}>{title}</h1>
                   <p style={{ fontSize: '0.8125rem', color: 'var(--text-300)', marginTop: '0.2rem' }}>{sub}</p>

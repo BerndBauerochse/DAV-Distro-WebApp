@@ -41,12 +41,12 @@ export function LoginPage({ onLogin }: Props) {
               <img src="/logo.png" alt="DAV" className="w-8 h-8 object-contain" />
             </div>
             <div>
-              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-100)' }}>DAV Distro</p>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-100)' }}>DAV Distro</p>
               <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Audio Distribution Platform</p>
             </div>
           </div>
 
-          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.375rem', letterSpacing: '-0.02em', color: 'var(--text-100)', marginBottom: '0.25rem' }}>
+          <h2 style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 700, fontSize: '1.375rem', letterSpacing: '-0.02em', color: 'var(--text-100)', marginBottom: '0.25rem' }}>
             Anmelden
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-300)', marginBottom: '1.75rem' }}>

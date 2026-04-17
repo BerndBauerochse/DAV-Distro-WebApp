@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Figtree:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,9 +13,9 @@
   --glass-shadow:   0 24px 64px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.35);
 
   /* Shell */
-  --shell-bg:       rgba(9,13,32,0.60);
-  --sidebar-bg:     rgba(6,9,24,0.80);
-  --card-bg:        rgba(12,17,42,0.58);
+  --shell-bg:       rgba(9,13,32,0.45);
+  --sidebar-bg:     rgba(6,9,24,0.60);
+  --card-bg:        rgba(12,17,42,0.50);
 
   /* Accent */
   --cyan:           #22d3ee;
@@ -43,7 +43,7 @@
   html { height: 100%; }
 
   body {
-    font-family: 'Figtree', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     color: var(--text-100);
     min-height: 100%;
@@ -51,7 +51,7 @@
   }
 
   h1, h2, h3, .font-display {
-    font-family: 'Syne', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
 
   /* Custom scrollbar */
@@ -84,7 +84,7 @@
   background-color: #060a1a;
   /* Soft zoom blur on edges */
   transform: scale(1.04);
-  filter: brightness(0.82) saturate(1.15);
+  filter: brightness(0.95) saturate(1.05);
   z-index: 0;
 }
 
@@ -95,13 +95,10 @@
   inset: 0;
   z-index: 1;
   background:
-    /* Top violet nebula */
-    radial-gradient(ellipse 90% 55% at 20% 0%,  rgba(88,28,135,0.45) 0%, transparent 60%),
-    radial-gradient(ellipse 70% 45% at 78% 2%,  rgba(49,46,129,0.38) 0%, transparent 55%),
-    /* Bottom darkness */
-    radial-gradient(ellipse 120% 50% at 50% 100%, rgba(2,4,14,0.75) 0%, transparent 60%),
-    /* Overall dark veil */
-    linear-gradient(180deg, rgba(4,5,18,0.38) 0%, rgba(6,9,22,0.42) 50%, rgba(2,4,12,0.65) 100%);
+    /* Subtle bottom vignette for readability */
+    radial-gradient(ellipse 120% 40% at 50% 100%, rgba(2,4,14,0.45) 0%, transparent 70%),
+    /* Very light overall veil */
+    linear-gradient(180deg, rgba(4,5,18,0.10) 0%, rgba(6,9,22,0.15) 100%);
 }
 
 /* Animated ambient orbs */
@@ -230,7 +227,7 @@
 
   /* Accent button */
   .btn-accent {
-    font-family: 'Syne', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-weight: 600;
     font-size: 0.8125rem;
     letter-spacing: 0.01em;
@@ -291,7 +288,7 @@
 
   /* Labels */
   .label {
-    font-family: 'Syne', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-size: 0.6875rem;
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -309,7 +306,7 @@
 
   /* Stat number */
   .stat-num {
-    font-family: 'Syne', sans-serif;
+    font-family: 'DM Sans', sans-serif;
     font-weight: 700;
     font-size: 1.875rem;
     line-height: 1;
