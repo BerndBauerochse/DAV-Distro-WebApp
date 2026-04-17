@@ -81,6 +81,7 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
   }
 
   const activeUploads = uploads.filter(u => u.category === category.key && u.status !== 'done')
+  const queuedCount   = activeUploads.filter(u => u.status === 'queued').length
   const totalSize = files.reduce((s: number, f: FileEntry) => s + f.size, 0)
   const isCovers = category.key === 'covers'
   const allSelected = files.length > 0 && selected.size === files.length
@@ -117,7 +118,14 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
       {activeUploads.length > 0 && (
         <div className="rounded-xl p-4 space-y-2"
           style={{ background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.15)' }}>
-          <p className="section-label mb-3">Upload läuft…</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="section-label">Upload läuft…</p>
+            {queuedCount > 0 && (
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {queuedCount} in Warteschlange
+              </span>
+            )}
+          </div>
           {activeUploads.map(task => (
             <div key={task.id} className="space-y-1">
               <div className="flex justify-between items-center gap-2">
@@ -126,6 +134,8 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
                   ? <span className="text-xs shrink-0 flex items-center gap-1" style={{ color: '#f87171' }}>
                       <AlertCircle className="w-3 h-3" /> Fehler
                     </span>
+                  : task.status === 'queued'
+                  ? <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>wartet</span>
                   : <span className="text-xs font-medium shrink-0 w-9 text-right" style={{ color: '#22d3ee' }}>
                       {task.progress}%
                     </span>
@@ -134,10 +144,8 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
               <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                 <div className="h-1.5 rounded-full transition-all duration-200"
                   style={{
-                    width: `${task.status === 'error' ? 100 : task.progress}%`,
-                    background: task.status === 'error'
-                      ? '#f87171'
-                      : 'linear-gradient(90deg,#22d3ee,#0ea5e9)',
+                    width: task.status === 'queued' ? '0%' : `${task.status === 'error' ? 100 : task.progress}%`,
+                    background: task.status === 'error' ? '#f87171' : 'linear-gradient(90deg,#22d3ee,#0ea5e9)',
                   }} />
               </div>
               {task.status === 'error' && task.error && (
