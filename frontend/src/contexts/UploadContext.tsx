@@ -7,10 +7,11 @@ import { getStoredAuth } from '../hooks/useAuth'
 import type { FileCategory, FileEntry } from '../types'
 
 const BASE = '/api'
-const CHUNK_SIZE       = 10 * 1024 * 1024  // 10 MB per chunk
-const MAX_CHUNK_PARALLEL = 4               // concurrent chunk uploads per file
-const MAX_FILE_CONCURRENCY = 3             // max simultaneous file uploads
-const MAX_RETRIES      = 3                 // retries per chunk
+const CHUNK_SIZE         = 5 * 1024 * 1024  // 5 MB per chunk — reliable through proxies
+const MAX_CHUNK_PARALLEL = 8               // sliding-window concurrency per file
+const MAX_FILE_CONCURRENCY = 2             // max simultaneous file uploads (ZIPs are large)
+const MAX_RETRIES        = 4              // retries per chunk
+const CHUNK_TIMEOUT_MS   = 120_000        // abort + retry if chunk takes > 2 min
 
 export type UploadStatus = 'queued' | 'uploading' | 'done' | 'error'
 
@@ -111,14 +112,12 @@ async function _uploadFile(
   }
 
   try {
+    // Sliding-window: always keep MAX_CHUNK_PARALLEL chunks in flight.
+    // All chunks except the last are uploaded first; the last triggers assembly.
     const nonFinalIndices = Array.from({ length: totalChunks - 1 }, (_, i) => i)
-
-    for (let i = 0; i < nonFinalIndices.length; i += MAX_CHUNK_PARALLEL) {
-      const batch = nonFinalIndices.slice(i, i + MAX_CHUNK_PARALLEL)
-      await Promise.all(batch.map(idx =>
-        _uploadChunk(category, file, idx, totalChunks, chunkSent, reportProgress)
-      ))
-    }
+    await _pooled(nonFinalIndices, MAX_CHUNK_PARALLEL, idx =>
+      _uploadChunk(category, file, idx, totalChunks, chunkSent, reportProgress)
+    )
 
     // Last chunk triggers server-side assembly
     const entry = await _uploadChunk(
@@ -138,6 +137,22 @@ async function _uploadFile(
   } catch (err) {
     update(id, { status: 'error', error: (err as Error).message })
   }
+}
+
+/** Run tasks with at most `concurrency` in flight at any time (sliding window). */
+async function _pooled<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let idx = 0
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++
+      await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
 }
 
 async function _uploadChunk(
@@ -185,6 +200,7 @@ function _xhrChunk(
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `${BASE}/files/${category}/chunks`)
+    xhr.timeout = CHUNK_TIMEOUT_MS
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
     xhr.upload.onprogress = (e) => {
@@ -206,7 +222,8 @@ function _xhrChunk(
       }
     }
 
-    xhr.onerror = () => reject(new Error(`Netzwerkfehler bei Chunk ${index}`))
+    xhr.onerror   = () => reject(new Error(`Netzwerkfehler bei Chunk ${index}`))
+    xhr.ontimeout = () => reject(new Error(`Timeout bei Chunk ${index} — wird wiederholt`))
     xhr.send(form)
   })
 }
