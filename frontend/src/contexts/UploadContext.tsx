@@ -7,11 +7,11 @@ import { getStoredAuth } from '../hooks/useAuth'
 import type { FileCategory, FileEntry } from '../types'
 
 const BASE = '/api'
-const CHUNK_SIZE         = 5 * 1024 * 1024  // 5 MB per chunk — reliable through proxies
-const MAX_CHUNK_PARALLEL = 8               // sliding-window concurrency per file
-const MAX_FILE_CONCURRENCY = 2             // max simultaneous file uploads (ZIPs are large)
-const MAX_RETRIES        = 4              // retries per chunk
-const CHUNK_TIMEOUT_MS   = 120_000        // abort + retry if chunk takes > 2 min
+const CHUNK_SIZE         = 20 * 1024 * 1024  // 20 MB — fewer requests, less overhead
+const MAX_CHUNK_PARALLEL = 6                 // sliding-window concurrency per file
+const MAX_FILE_CONCURRENCY = 2              // max simultaneous file uploads
+const MAX_RETRIES        = 4               // retries per chunk
+const CHUNK_TIMEOUT_MS   = 180_000         // 3 min timeout per chunk (20 MB on slow link)
 
 export type UploadStatus = 'queued' | 'uploading' | 'done' | 'error'
 
@@ -191,16 +191,19 @@ function _xhrChunk(
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const { token } = getStoredAuth()
-    const form = new FormData()
-    form.append('chunk', blob, filename)
-    form.append('filename', filename)
-    form.append('chunk_index', String(index))
-    form.append('total_chunks', String(total))
-    if (expectedSize !== undefined) form.append('expected_size', String(expectedSize))
+
+    // Raw binary body — no multipart parsing on the server
+    const params = new URLSearchParams({
+      filename,
+      chunk_index: String(index),
+      total_chunks: String(total),
+      ...(expectedSize !== undefined ? { expected_size: String(expectedSize) } : {}),
+    })
 
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${BASE}/files/${category}/chunks`)
+    xhr.open('POST', `${BASE}/files/${category}/chunks?${params}`)
     xhr.timeout = CHUNK_TIMEOUT_MS
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream')
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
     xhr.upload.onprogress = (e) => {
@@ -224,7 +227,7 @@ function _xhrChunk(
 
     xhr.onerror   = () => reject(new Error(`Netzwerkfehler bei Chunk ${index}`))
     xhr.ontimeout = () => reject(new Error(`Timeout bei Chunk ${index} — wird wiederholt`))
-    xhr.send(form)
+    xhr.send(blob)
   })
 }
 
