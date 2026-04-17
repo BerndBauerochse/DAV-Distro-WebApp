@@ -46,6 +46,33 @@ export interface ProgressEvent {
   error: string | null
 }
 
+export interface BookInfo {
+  ean: string
+  title: string
+  author: string
+  abridged: boolean | null   // true=Gekürzt, false=Ungekürzt, null=unbekannt
+  zip_available: boolean
+}
+
+export interface PortalVariant {
+  key: string
+  label: string
+}
+
+export interface BatchPreview {
+  filename: string
+  detected_portal: string
+  portal_variants: PortalVariant[]
+  books: BookInfo[]
+}
+
+export interface MailDraft {
+  to: string
+  subject: string
+  body: string
+  is_html?: boolean
+}
+
 export interface RunUpdateEvent {
   type: 'run_update'
   run_id: string
@@ -55,6 +82,7 @@ export interface RunUpdateEvent {
   completed_files: number
   failed_files: number
   skipped_files: number
+  mail_draft?: MailDraft
 }
 
 export type WsEvent = ProgressEvent | RunUpdateEvent

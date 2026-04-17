@@ -9,6 +9,7 @@ from app.database import get_db, AsyncSessionLocal
 from app.models import DeliveryRun, DeliveryLog
 from app.schemas import DeliveryRunOut, DeliveryRunDetail, DeliveryLogOut
 from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY
+from app.modules.metadata_parser import parse_metadata
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -55,6 +56,50 @@ async def get_run_logs(
         q = q.where(DeliveryLog.status == status)
     result = await db.execute(q)
     return result.scalars().all()
+
+
+@router.post("/preview")
+async def preview_metadata(
+    metadata_file: UploadFile = File(...),
+    _user: str = Depends(get_current_user),
+):
+    """Parst eine Metadatei, erkennt das Portal und gibt Buchtitel + ZIP-Verfügbarkeit zurück."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    storage_root = os.getenv("STORAGE_DIR", "/storage")
+    source_dir = os.path.join(storage_root, "zips")
+
+    suffix = _Path(metadata_file.filename or "file").suffix or ".xml"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
+        f.write(await metadata_file.read())
+        temp_path = f.name
+
+    try:
+        result = parse_metadata(temp_path, metadata_file.filename or "", source_dir)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+
+    return {
+        "filename": result.filename,
+        "detected_portal": result.detected_portal,
+        "portal_variants": result.portal_variants,
+        "books": [
+            {
+                "ean": b.ean,
+                "title": b.title,
+                "author": b.author,
+                "abridged": b.abridged,
+                "zip_available": b.zip_available,
+            }
+            for b in result.books
+        ],
+    }
 
 
 @router.post("/check")

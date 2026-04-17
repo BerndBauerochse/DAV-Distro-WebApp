@@ -93,6 +93,23 @@ def ftps_connection(host: str, port: int, username: str, password: str):
             ftp.close()
 
 
+def sftp_makedirs(sftp: paramiko.SFTPClient, remote_path: str) -> None:
+    """Create remote directory and all parents if they don't exist."""
+    parts = remote_path.strip("/").split("/")
+    current = ""
+    for part in parts:
+        if not part:
+            continue
+        current = f"{current}/{part}"
+        try:
+            sftp.stat(current)
+        except IOError:
+            try:
+                sftp.mkdir(current)
+            except IOError:
+                pass  # race condition or already exists
+
+
 def ftp_upload(
     ftp: ftplib.FTP,
     local_path: str,

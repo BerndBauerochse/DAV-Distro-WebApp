@@ -246,9 +246,17 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             _record_system_error(db_session_factory, run_id, portal_key, error_message), loop
         ).result()
 
+    # Collect mail draft if module supports it (only on success)
+    mail_draft = None
+    if final_status == "completed":
+        try:
+            mail_draft = module.get_mail_draft()
+        except Exception:
+            pass
+
     asyncio.run_coroutine_threadsafe(
         _finalize_run(db_session_factory, run_id, portal_key, final_status,
-                      total, completed, failed, skipped, error_message),
+                      total, completed, failed, skipped, error_message, mail_draft),
         loop,
     ).result()
 
@@ -297,7 +305,7 @@ async def _update_run_counts(db_session_factory, run_id, total, completed, faile
 
 async def _finalize_run(
     db_session_factory, run_id, portal_key, status,
-    total=0, completed=0, failed=0, skipped=0, error_message=None,
+    total=0, completed=0, failed=0, skipped=0, error_message=None, mail_draft=None,
 ):
     async with db_session_factory() as db:
         await db.execute(
@@ -326,5 +334,7 @@ async def _finalize_run(
     }
     if error_message:
         msg["error"] = error_message
+    if mail_draft:
+        msg["mail_draft"] = mail_draft
 
     await ws_manager.broadcast(msg)

@@ -1,4 +1,4 @@
-import type { DeliveryRun, DeliveryLog, Portal, FileEntry, FileCategory } from '../types'
+import type { DeliveryRun, DeliveryLog, Portal, FileEntry, FileCategory, BatchPreview } from '../types'
 import { getStoredAuth } from '../hooks/useAuth'
 
 const BASE = '/api'
@@ -56,6 +56,12 @@ export const api = {
 
   getPortals(): Promise<Portal[]> {
     return request('/portals')
+  },
+
+  async previewMetadata(file: File): Promise<BatchPreview> {
+    const form = new FormData()
+    form.append('metadata_file', file)
+    return request('/runs/preview', { method: 'POST', body: form })
   },
 
   async checkRun(portal: string, file?: File): Promise<{ missing: string[] }> {

@@ -2,20 +2,17 @@ import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity } from 'lucide-react'
 import { ActiveRunCard } from './ActiveRunCard'
-import { StartDelivery } from './StartDelivery'
+import { BatchBuilder } from './BatchBuilder'
+import { MailDraftModal } from './MailDraftModal'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { api } from '../api/client'
-import type { DeliveryRun, WsEvent, ActiveTransfer } from '../types'
+import type { DeliveryRun, WsEvent, ActiveTransfer, MailDraft } from '../types'
 
 export function Dashboard() {
   const qc = useQueryClient()
   const [activeRuns, setActiveRuns] = useState<Map<string, DeliveryRun>>(new Map())
   const [transfers, setTransfers] = useState<Map<string, ActiveTransfer[]>>(new Map())
-
-  const { data: portals = [] } = useQuery({
-    queryKey: ['portals'],
-    queryFn: api.getPortals,
-  })
+  const [mailDraft, setMailDraft] = useState<{ draft: MailDraft; portalName: string } | null>(null)
 
   // Fetch currently running runs on mount
   const { data: initialRuns } = useQuery({
@@ -64,6 +61,11 @@ export function Dashboard() {
           return next
         })
         qc.invalidateQueries({ queryKey: ['runs'] })
+        // Show mail draft modal if present
+        if (event.mail_draft) {
+          const portalName = event.portal.charAt(0).toUpperCase() + event.portal.slice(1)
+          setMailDraft({ draft: event.mail_draft, portalName })
+        }
       }
     }
 
@@ -134,8 +136,15 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Start panel */}
-      <StartDelivery portals={portals} onStarted={handleStarted} />
+      {mailDraft && (
+        <MailDraftModal
+          draft={mailDraft.draft}
+          portalName={mailDraft.portalName}
+          onClose={() => setMailDraft(null)}
+        />
+      )}
+      {/* Batch builder */}
+      <BatchBuilder onStarted={handleStarted} />
 
       {/* Active runs */}
       <div>

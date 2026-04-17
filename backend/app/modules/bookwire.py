@@ -36,6 +36,7 @@ class BookwireModule(BasePortalModule):
         self.sftp_password = pw
         self.remote_dir = self._get(sec, "remote_dir", "/assets")
         self.remote_dir_xml = self._get(sec, "remote_dir_xml", "/xml")
+        self.pdf_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         os.makedirs(self.export_dir, exist_ok=True)
@@ -144,10 +145,38 @@ class BookwireModule(BasePortalModule):
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
     def _prepare_zip(self, src: str, dest: str, ean: str) -> None:
-        """Copy ZIP to export dir. Could be extended for transformations."""
-        if src != dest:
-            import shutil
-            shutil.copy2(src, dest)
+        """Kopiert ZIP in export_dir. Wenn eine PDF mit gleicher EAN in pdf_dir liegt:
+        ZIP entpacken, PDF als {ean}_booklet.pdf einfügen, neu packen."""
+        import shutil
+        import tempfile
+
+        # Prüfen ob eine PDF für diese EAN im pdf_dir liegt
+        pdf_src = os.path.join(self.pdf_dir, f"{ean}.pdf")
+        if not os.path.isfile(pdf_src):
+            # Keine PDF → einfach kopieren
+            if src != dest:
+                shutil.copy2(src, dest)
+            return
+
+        # PDF vorhanden → ZIP entpacken, PDF einfügen, neu packen
+        logger.info(f"Bookwire: PDF gefunden für {ean} — wird in ZIP eingefügt: {pdf_src}")
+        with tempfile.TemporaryDirectory() as tmp:
+            with zipfile.ZipFile(src, "r") as zf:
+                zf.extractall(tmp)
+
+            # PDF als {ean}_booklet.pdf in ZIP-Wurzel kopieren
+            pdf_dest = os.path.join(tmp, f"{ean}_booklet.pdf")
+            shutil.copy2(pdf_src, pdf_dest)
+
+            # Neu packen
+            with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as new_zip:
+                for root_dir, _, files in os.walk(tmp):
+                    for fname in files:
+                        full_path = os.path.join(root_dir, fname)
+                        arcname = os.path.relpath(full_path, tmp).replace("\\", "/")
+                        new_zip.write(full_path, arcname=arcname)
+
+        logger.info(f"Bookwire: ZIP neu gepackt mit {ean}_booklet.pdf: {os.path.basename(dest)}")
 
 
 @register_portal("bookwire_moa")
