@@ -104,4 +104,29 @@ export const api = {
     a.click()
     URL.revokeObjectURL(blobUrl)
   },
+
+  deleteRun(runId: string): Promise<void> {
+    return request(`/runs/${runId}`, { method: 'DELETE' })
+  },
+
+  cancelRun(runId: string): Promise<void> {
+    return request(`/runs/${runId}/cancel`, { method: 'POST' })
+  },
+
+  async exportRuns(format: 'csv' | 'xlsx', portal?: string): Promise<void> {
+    const params = new URLSearchParams({ format })
+    if (portal) params.set('portal', portal)
+    const { token } = getStoredAuth()
+    const res = await fetch(`${BASE}/runs/export?${params}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error(`Export fehlgeschlagen: ${res.status}`)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = `auslieferungen.${format}`
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+  },
 }

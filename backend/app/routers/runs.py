@@ -1,15 +1,16 @@
+import io
 import os
 import uuid
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, delete as sql_delete
 
 from app.database import get_db, AsyncSessionLocal
 from app.models import DeliveryRun, DeliveryLog
 from app.schemas import DeliveryRunOut, DeliveryRunDetail, DeliveryLogOut
-from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY, get_metadata_path
+from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY, get_metadata_path, request_cancel
 from app.modules.metadata_parser import parse_metadata
 from app.auth import get_current_user
 
@@ -31,6 +32,63 @@ async def list_runs(
         q = q.where(DeliveryRun.portal == portal)
     result = await db.execute(q)
     return result.scalars().all()
+
+
+@router.get("/export")
+async def export_runs(
+    format: str = "csv",
+    portal: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Export run history as CSV or XLSX."""
+    import pandas as pd
+
+    q = select(DeliveryRun).order_by(desc(DeliveryRun.started_at))
+    if portal:
+        q = q.where(DeliveryRun.portal == portal)
+    result = await db.execute(q)
+    runs = result.scalars().all()
+
+    rows = []
+    for r in runs:
+        duration = ""
+        if r.finished_at and r.started_at:
+            delta = (r.finished_at.replace(tzinfo=None) - r.started_at.replace(tzinfo=None)).total_seconds()
+            duration = f"{int(delta // 60)}m {int(delta % 60)}s"
+        rows.append({
+            "Run-ID": str(r.id),
+            "Portal": r.portal,
+            "Metadatei": r.metadata_filename or "",
+            "Status": r.status,
+            "Gesamt": r.total_files,
+            "Erfolgreich": r.completed_files,
+            "Fehler": r.failed_files,
+            "Übersprungen": r.skipped_files,
+            "Benutzer": r.initiated_by or "",
+            "Gestartet": r.started_at.strftime("%Y-%m-%d %H:%M:%S") if r.started_at else "",
+            "Beendet": r.finished_at.strftime("%Y-%m-%d %H:%M:%S") if r.finished_at else "",
+            "Dauer": duration,
+        })
+
+    df = pd.DataFrame(rows)
+    buf = io.BytesIO()
+
+    if format == "xlsx":
+        df.to_excel(buf, index=False)
+        buf.seek(0)
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=auslieferungen.xlsx"},
+        )
+    else:
+        csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
+        return StreamingResponse(
+            iter([csv_bytes]),
+            media_type="text/csv; charset=utf-8-sig",
+            headers={"Content-Disposition": "attachment; filename=auslieferungen.csv"},
+        )
 
 
 @router.get("/{run_id}", response_model=DeliveryRunDetail)
@@ -178,3 +236,28 @@ async def download_run_metadata(
     if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Metadatei nicht (mehr) verfügbar")
     return FileResponse(path=path, filename=os.path.basename(path))
+
+
+@router.post("/{run_id}/cancel", status_code=202)
+async def cancel_run(
+    run_id: uuid.UUID,
+    _user: str = Depends(get_current_user),
+):
+    """Signal a running delivery to stop after the current file."""
+    request_cancel(str(run_id))
+    return {"ok": True}
+
+
+@router.delete("/{run_id}", status_code=204)
+async def delete_run(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Delete a run and all its log entries."""
+    run = await db.get(DeliveryRun, run_id)
+    if not run:
+        raise HTTPException(404, "Run not found")
+    await db.execute(sql_delete(DeliveryLog).where(DeliveryLog.run_id == run_id))
+    await db.delete(run)
+    await db.commit()

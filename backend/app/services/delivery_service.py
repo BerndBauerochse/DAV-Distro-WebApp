@@ -6,6 +6,7 @@ import uuid
 import logging
 import configparser
 import os
+import threading
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -26,9 +27,19 @@ PORTAL_REGISTRY: dict[str, type] = {}
 # Used by the download endpoint so the user can save the attachment.
 _run_metadata_paths: dict[str, str] = {}
 
+# Cancel signals: run_id (str) → threading.Event set when cancel requested
+_cancel_events: dict[str, threading.Event] = {}
+
 
 def get_metadata_path(run_id: str) -> str | None:
     return _run_metadata_paths.get(run_id)
+
+
+def request_cancel(run_id: str) -> None:
+    """Signal a running delivery to stop after the current file."""
+    event = _cancel_events.get(str(run_id))
+    if event:
+        event.set()
 
 PORTAL_DISPLAY_NAMES = {
     "audible": "Audible",
@@ -116,6 +127,11 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
     # Cache metadata path so the download endpoint can serve it
     if metadata_path:
         _run_metadata_paths[str(run_id)] = metadata_path
+
+    # Register cancel event for this run
+    cancel_event = threading.Event()
+    _cancel_events[str(run_id)] = cancel_event
+
     config = load_config()
     module_cls = PORTAL_REGISTRY.get(portal_key)
     error_message: str | None = None
@@ -123,6 +139,7 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
     if module_cls is None:
         error_message = f"Kein Modul für Portal '{portal_key}' registriert."
         logger.error(error_message)
+        _cancel_events.pop(str(run_id), None)
         asyncio.run_coroutine_threadsafe(
             _record_system_error(db_session_factory, run_id, portal_key, error_message), loop
         ).result()
@@ -187,6 +204,10 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
         def progress_cb(run_id, ean, file_name, file_type, current, total_bytes, status, error=None):
             nonlocal completed, failed, skipped
+            # Cancel check — raises InterruptedError to abort ship()
+            if cancel_event.is_set():
+                raise InterruptedError("Auslieferung wurde abgebrochen")
+
             if status == "success":
                 completed += 1
             elif status == "failed":
@@ -237,8 +258,23 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             asyncio.run_coroutine_threadsafe(
                 _insert_logs(db_session_factory, log_records), loop
             ).result()
+            log_records.clear()
 
-        final_status = "failed" if failed == total and total > 0 else "completed"
+        # If cancel was signalled but absorbed by parallel workers, honour it here
+        if cancel_event.is_set():
+            final_status = "cancelled"
+        else:
+            final_status = "failed" if failed == total and total > 0 else "completed"
+
+    except InterruptedError as e:
+        error_message = str(e)
+        logger.info(f"Delivery run {run_id} cancelled by user")
+        final_status = "cancelled"
+        if log_records:
+            asyncio.run_coroutine_threadsafe(
+                _insert_logs(db_session_factory, log_records), loop
+            ).result()
+            log_records.clear()
 
     except Exception as e:
         error_message = str(e)
@@ -256,6 +292,18 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
         asyncio.run_coroutine_threadsafe(
             _record_system_error(db_session_factory, run_id, portal_key, error_message), loop
         ).result()
+
+    finally:
+        _cancel_events.pop(str(run_id), None)
+
+    # Fix any remaining 'pending' log entries → 'skipped'
+    try:
+        n_fixed = asyncio.run_coroutine_threadsafe(
+            _fixup_pending_logs(db_session_factory, run_id), loop
+        ).result()
+        skipped += n_fixed
+    except Exception:
+        pass
 
     # Collect mail draft if module supports it (only on success)
     mail_draft = None
@@ -277,6 +325,18 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
                       total, completed, failed, skipped, error_message, mail_draft),
         loop,
     ).result()
+
+
+async def _fixup_pending_logs(db_session_factory, run_id) -> int:
+    """Update any remaining 'pending' logs to 'skipped' after a run ends. Returns count updated."""
+    async with db_session_factory() as db:
+        result = await db.execute(
+            update(DeliveryLog)
+            .where(DeliveryLog.run_id == run_id, DeliveryLog.status == "pending")
+            .values(status="skipped", finished_at=datetime.now(timezone.utc))
+        )
+        await db.commit()
+        return result.rowcount
 
 
 async def _record_system_error(db_session_factory, run_id, portal_key, error_message: str):
