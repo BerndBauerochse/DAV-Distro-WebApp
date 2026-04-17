@@ -7,6 +7,7 @@ import { History } from './components/History'
 import { FileManager } from './components/FileManager'
 import { LoginPage } from './components/LoginPage'
 import { useAuth } from './hooks/useAuth'
+import { UploadProvider } from './contexts/UploadContext'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+    <UploadProvider>
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Top nav */}
         <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10">
@@ -81,6 +83,7 @@ export function App() {
           {page === 'files' && <FileManager />}
         </main>
       </div>
+    </UploadProvider>
     </QueryClientProvider>
   )
 }

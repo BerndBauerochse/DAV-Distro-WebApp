@@ -82,59 +82,6 @@ export const api = {
     return request(`/files/${category}`)
   },
 
-  async uploadFile(
-    category: FileCategory,
-    file: File,
-    onProgress?: (percent: number) => void,
-  ): Promise<FileEntry> {
-    const CHUNK_SIZE = 5 * 1024 * 1024  // 5 MB — safely under Traefik's 60s readTimeout
-    const totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE))
-    let result: FileEntry | null = null
-
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * CHUNK_SIZE
-      const blob = file.slice(start, Math.min(start + CHUNK_SIZE, file.size))
-
-      const form = new FormData()
-      form.append('chunk', blob, file.name)
-      form.append('filename', file.name)
-      form.append('chunk_index', String(i))
-      form.append('total_chunks', String(totalChunks))
-
-      result = await new Promise<FileEntry>((resolve, reject) => {
-        const { token } = getStoredAuth()
-        const xhr = new XMLHttpRequest()
-        xhr.open('POST', `${BASE}/files/${category}/chunks`)
-        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable && onProgress) {
-            const overall = ((i + e.loaded / e.total) / totalChunks) * 100
-            onProgress(Math.round(overall))
-          }
-        }
-
-        xhr.onload = () => {
-          if (xhr.status === 401) {
-            localStorage.removeItem('dav_token')
-            localStorage.removeItem('dav_username')
-            window.location.reload()
-            reject(new Error('Unauthorized'))
-          } else if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(JSON.parse(xhr.responseText))
-          } else {
-            reject(new Error(`${xhr.status} ${xhr.responseText}`))
-          }
-        }
-
-        xhr.onerror = () => reject(new Error('Netzwerkfehler'))
-        xhr.send(form)
-      })
-    }
-
-    return result!
-  },
-
   deleteFile(category: FileCategory, filename: string): Promise<void> {
     return request(`/files/${category}/${encodeURIComponent(filename)}`, { method: 'DELETE' })
   },

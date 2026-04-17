@@ -67,6 +67,7 @@ async def upload_chunk(
     filename: str = Form(...),
     chunk_index: int = Form(...),
     total_chunks: int = Form(...),
+    expected_size: int | None = Form(default=None),
     _user: str = Depends(get_current_user),
 ):
     folder = _category_path(category)
@@ -80,17 +81,36 @@ async def upload_chunk(
     if chunk_index < total_chunks - 1:
         return {"chunk": chunk_index, "done": False}
 
-    # Last chunk received — assemble final file
+    # Last chunk received — verify all parts present, then assemble
+    for i in range(total_chunks):
+        if not (CHUNK_TEMP / f"{filename}.part{i}").exists():
+            raise HTTPException(status_code=409, detail=f"Teil {i} fehlt — Upload bitte neu starten.")
+
     dest = folder / filename
-    async with aiofiles.open(dest, "wb") as out:
-        for i in range(total_chunks):
-            part = CHUNK_TEMP / f"{filename}.part{i}"
-            async with aiofiles.open(part, "rb") as inp:
-                while data := await inp.read(READ_SIZE):
-                    await out.write(data)
-            part.unlink()
+    try:
+        async with aiofiles.open(dest, "wb") as out:
+            for i in range(total_chunks):
+                part = CHUNK_TEMP / f"{filename}.part{i}"
+                async with aiofiles.open(part, "rb") as inp:
+                    while data := await inp.read(READ_SIZE):
+                        await out.write(data)
+                part.unlink()
+    except Exception:
+        # Clean up incomplete file
+        if dest.exists():
+            dest.unlink()
+        raise
 
     stat = dest.stat()
+
+    # Server-side size check
+    if expected_size is not None and stat.st_size != expected_size:
+        dest.unlink()
+        raise HTTPException(
+            status_code=422,
+            detail=f"Größenprüfung fehlgeschlagen: erwartet {expected_size} Bytes, erhalten {stat.st_size} Bytes."
+        )
+
     return FileEntry(name=dest.name, size=stat.st_size, modified=stat.st_mtime)
 
 

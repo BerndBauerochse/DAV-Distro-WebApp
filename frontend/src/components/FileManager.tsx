@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Loader2, AlertCircle } from 'lucide-react'
 import { api } from '../api/client'
+import { useUpload } from '../contexts/UploadContext'
 import type { FileCategory, FileEntry } from '../types'
 
 const CATEGORIES: { key: FileCategory; label: string; icon: React.ReactNode; accept: string; desc: string }[] = [
@@ -53,17 +54,12 @@ interface CategoryPanelProps {
   category: typeof CATEGORIES[number]
 }
 
-interface UploadTask {
-  progress: number
-  error?: string
-}
-
 function CategoryPanel({ category }: CategoryPanelProps) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
-  const [uploads, setUploads] = useState<Record<string, UploadTask>>({})
+  const { uploads, startUpload } = useUpload()
 
   const { data: files = [], isLoading, isError } = useQuery({
     queryKey: ['files', category.key],
@@ -81,31 +77,11 @@ function CategoryPanel({ category }: CategoryPanelProps) {
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return
     Array.from(fileList).forEach(file => {
-      setUploads(prev => ({ ...prev, [file.name]: { progress: 0 } }))
-      api.uploadFile(
-        category.key,
-        file,
-        (percent) => setUploads(prev => ({
-          ...prev,
-          [file.name]: { progress: percent },
-        })),
-      ).then(() => {
-        setUploads(prev => {
-          const next = { ...prev }
-          delete next[file.name]
-          return next
-        })
+      startUpload(category.key, file, () => {
         qc.invalidateQueries({ queryKey: ['files', category.key] })
-      }).catch((err: Error) => {
-        setUploads(prev => ({
-          ...prev,
-          [file.name]: { progress: 0, error: err.message },
-        }))
       })
     })
   }
-
-  const activeUploads = Object.entries(uploads)
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -113,6 +89,8 @@ function CategoryPanel({ category }: CategoryPanelProps) {
     handleFiles(e.dataTransfer.files)
   }
 
+  // Show uploading and errored tasks for this category
+  const activeUploads = uploads.filter(u => u.category === category.key && u.status !== 'done')
   const totalSize = files.reduce((sum: number, f: FileEntry) => sum + f.size, 0)
 
   return (
@@ -150,11 +128,11 @@ function CategoryPanel({ category }: CategoryPanelProps) {
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">
             Upload läuft…
           </p>
-          {activeUploads.map(([name, task]) => (
-            <div key={name} className="space-y-1">
+          {activeUploads.map(task => (
+            <div key={task.id} className="space-y-1">
               <div className="flex justify-between items-center gap-2">
-                <span className="text-sm text-gray-700 truncate">{name}</span>
-                {task.error ? (
+                <span className="text-sm text-gray-700 truncate">{task.filename}</span>
+                {task.status === 'error' ? (
                   <span className="text-xs text-red-500 shrink-0 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" /> Fehler
                   </span>
@@ -166,11 +144,11 @@ function CategoryPanel({ category }: CategoryPanelProps) {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className={`h-1.5 rounded-full transition-all duration-200 ${task.error ? 'bg-red-400' : 'bg-blue-500'}`}
-                  style={{ width: `${task.error ? 100 : task.progress}%` }}
+                  className={`h-1.5 rounded-full transition-all duration-200 ${task.status === 'error' ? 'bg-red-400' : 'bg-blue-500'}`}
+                  style={{ width: `${task.status === 'error' ? 100 : task.progress}%` }}
                 />
               </div>
-              {task.error && (
+              {task.status === 'error' && task.error && (
                 <p className="text-xs text-red-500">{task.error}</p>
               )}
             </div>
@@ -293,7 +271,7 @@ export function FileManager() {
         <div className="mb-4">
           <p className="text-xs text-gray-400">{active.desc}</p>
         </div>
-        <CategoryPanel key={activeTab} category={active} />
+        <CategoryPanel category={active} />
       </div>
     </div>
   )
