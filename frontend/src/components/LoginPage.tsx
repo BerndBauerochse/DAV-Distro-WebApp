@@ -13,97 +13,79 @@ export function LoginPage({ onLogin }: Props) {
   const [loading, setLoading]   = useState(false)
 
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      const data = await api.login(username, password)
-      onLogin(data.access_token, data.username)
-    } catch {
-      setError('Falscher Benutzername oder Passwort')
-    } finally {
-      setLoading(false)
-    }
+    e.preventDefault(); setError(''); setLoading(true)
+    try { const d = await api.login(username, password); onLogin(d.access_token, d.username) }
+    catch { setError('Falscher Benutzername oder Passwort') }
+    finally { setLoading(false) }
   }
 
   return (
-    <div className="app-bg min-h-screen flex items-center justify-center p-4">
-      <div className="vignette" />
+    <div className="app-stage">
+      <div className="orb orb-1" />
+      <div className="orb orb-2" />
+      <div className="orb orb-3" />
+      <div className="grain" />
 
-      <div className="relative z-10 w-full max-w-sm fade-in">
-        {/* Glass card */}
-        <div className="glass-card p-8">
+      {/* Login card */}
+      <div className="relative z-10 w-full max-w-sm px-4 fade-up">
+        <div className="glass-card p-8" style={{ boxShadow: '0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05) inset, 0 2px 0 rgba(255,255,255,0.07) inset' }}>
+
+          {/* Top accent */}
+          <div className="absolute top-0 left-12 right-12 h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(34,211,238,0.5), rgba(167,139,250,0.4), transparent)' }} />
 
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-glow"
-              style={{ background: 'linear-gradient(135deg,#e8002d,#b50024)' }}>
-              <span className="text-white font-bold text-sm tracking-wide">DAV</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'linear-gradient(135deg,#e8002d,#8b0013)', boxShadow: '0 4px 20px rgba(232,0,45,0.4)' }}>
+              <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, color: 'white', fontSize: '12px', letterSpacing: '0.04em' }}>DAV</span>
             </div>
             <div>
-              <p className="font-semibold text-white/90 text-base leading-tight">DAV Distro</p>
-              <p className="text-white/35 text-xs">Audio Distribution Platform</p>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-100)' }}>DAV Distro</p>
+              <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Audio Distribution Platform</p>
             </div>
           </div>
 
-          <h2 className="text-xl font-semibold text-white/90 mb-1">Anmelden</h2>
-          <p className="text-white/40 text-sm mb-6">Bitte melde dich mit deinen Zugangsdaten an.</p>
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.375rem', letterSpacing: '-0.02em', color: 'var(--text-100)', marginBottom: '0.25rem' }}>
+            Anmelden
+          </h2>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-300)', marginBottom: '1.75rem' }}>
+            Melde dich mit deinen Zugangsdaten an.
+          </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wider">
-                Benutzername
-              </label>
-              <input
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                required
-                className="glass-input w-full"
-                placeholder="benutzername"
-              />
+              <label className="label block mb-1.5">Benutzername</label>
+              <input type="text" autoComplete="username" value={username}
+                onChange={e => setUsername(e.target.value)} required
+                className="glass-input w-full" placeholder="benutzername" />
             </div>
-
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-1.5 uppercase tracking-wider">
-                Passwort
-              </label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                className="glass-input w-full"
-                placeholder="••••••••"
-              />
+              <label className="label block mb-1.5">Passwort</label>
+              <input type="password" autoComplete="current-password" value={password}
+                onChange={e => setPassword(e.target.value)} required
+                className="glass-input w-full" placeholder="••••••••" />
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-2 text-sm rounded-xl px-3 py-2.5"
+                style={{ background: 'rgba(248,113,113,0.09)', border: '1px solid rgba(248,113,113,0.22)', color: '#f87171' }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-accent w-full flex items-center justify-center gap-2 py-2.5 mt-2"
-            >
-              {loading
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <LogIn className="w-4 h-4" />
-              }
+            <button type="submit" disabled={loading}
+              className="btn-accent w-full flex items-center justify-center gap-2 py-2.5 mt-1">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
               {loading ? 'Anmelden…' : 'Anmelden'}
             </button>
           </form>
         </div>
 
-        {/* Subtle bottom glow */}
-        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-12 rounded-full blur-2xl"
-          style={{ background: 'rgba(34,211,238,0.12)' }} />
+        {/* Bottom ambient glow */}
+        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-2/3 h-16 rounded-full blur-3xl pointer-events-none"
+          style={{ background: 'rgba(34,211,238,0.1)' }} />
       </div>
     </div>
   )
