@@ -115,9 +115,9 @@ async function _uploadFile(
     // Sliding-window: always keep MAX_CHUNK_PARALLEL chunks in flight.
     // All chunks except the last are uploaded first; the last triggers assembly.
     const nonFinalIndices = Array.from({ length: totalChunks - 1 }, (_, i) => i)
-    await _pooled(nonFinalIndices, MAX_CHUNK_PARALLEL, idx =>
-      _uploadChunk(category, file, idx, totalChunks, chunkSent, reportProgress)
-    )
+    await _pooled(nonFinalIndices, MAX_CHUNK_PARALLEL, async idx => {
+      await _uploadChunk(category, file, idx, totalChunks, chunkSent, reportProgress)
+    })
 
     // Last chunk triggers server-side assembly
     const entry = await _uploadChunk(
