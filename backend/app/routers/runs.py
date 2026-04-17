@@ -1,9 +1,11 @@
 import io
 import os
 import uuid
+import email.message
+import email.utils
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, delete as sql_delete
 
@@ -236,6 +238,37 @@ async def download_run_metadata(
     if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Metadatei nicht (mehr) verfügbar")
     return FileResponse(path=path, filename=os.path.basename(path))
+
+
+@router.get("/{run_id}/mail.eml")
+async def download_mail_eml(
+    run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Generate and download a ready-to-send .eml file for Outlook."""
+    run = await db.get(DeliveryRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run nicht gefunden")
+    if not run.mail_draft:
+        raise HTTPException(status_code=404, detail="Kein Mail-Entwurf für diesen Run vorhanden")
+
+    draft = run.mail_draft
+    msg = email.message.EmailMessage()
+    msg["From"]    = "Der Audio Verlag <noreply@deraudioverlag.de>"
+    msg["To"]      = draft.get("to", "")
+    msg["Subject"] = draft.get("subject", "")
+    msg["Date"]    = email.utils.formatdate(localtime=True)
+    msg["MIME-Version"] = "1.0"
+    msg.set_content(draft.get("body", ""), subtype="html", charset="utf-8")
+
+    eml_bytes = bytes(msg)
+    filename  = f"audible-{run_id}.eml"
+    return Response(
+        content=eml_bytes,
+        media_type="message/rfc822",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/{run_id}/cancel", status_code=202)

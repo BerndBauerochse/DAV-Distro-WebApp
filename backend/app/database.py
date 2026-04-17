@@ -16,8 +16,13 @@ class Base(DeclarativeBase):
 
 
 async def init_db():
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migration: add mail_draft column to existing deployments
+        await conn.execute(text(
+            "ALTER TABLE delivery_runs ADD COLUMN IF NOT EXISTS mail_draft JSONB"
+        ))
 
 
 async def get_db():

@@ -396,6 +396,7 @@ async def _finalize_run(
                 completed_files=completed,
                 failed_files=failed,
                 skipped_files=skipped,
+                mail_draft=mail_draft,
             )
         )
         await db.commit()

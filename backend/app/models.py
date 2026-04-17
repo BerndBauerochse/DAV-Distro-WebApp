@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Text, DateTime, BigInteger, Integer, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -26,6 +26,7 @@ class DeliveryRun(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mail_draft:  Mapped[dict | None]     = mapped_column(JSONB, nullable=True)
 
     logs: Mapped[list["DeliveryLog"]] = relationship(
         back_populates="run", cascade="all, delete-orphan"

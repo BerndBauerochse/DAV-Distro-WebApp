@@ -12,7 +12,7 @@ export function Dashboard() {
   const qc = useQueryClient()
   const [activeRuns, setActiveRuns] = useState<Map<string, DeliveryRun>>(new Map())
   const [transfers, setTransfers] = useState<Map<string, ActiveTransfer[]>>(new Map())
-  const [mailDraft, setMailDraft] = useState<{ draft: MailDraft; portalName: string } | null>(null)
+  const [mailDraft, setMailDraft] = useState<{ runId: string; draft: MailDraft; portalName: string } | null>(null)
 
   const { data: initialRuns } = useQuery({
     queryKey: ['active-runs'],
@@ -53,7 +53,7 @@ export function Dashboard() {
         qc.invalidateQueries({ queryKey: ['runs'] })
         if (event.mail_draft) {
           const portalName = event.portal.charAt(0).toUpperCase() + event.portal.slice(1)
-          setMailDraft({ draft: event.mail_draft, portalName })
+          setMailDraft({ runId: event.run_id, draft: event.mail_draft, portalName })
         }
       }
     }
@@ -105,6 +105,7 @@ export function Dashboard() {
     <div className="space-y-6">
       {mailDraft && (
         <MailDraftModal
+          runId={mailDraft.runId}
           draft={mailDraft.draft}
           portalName={mailDraft.portalName}
           onClose={() => setMailDraft(null)}

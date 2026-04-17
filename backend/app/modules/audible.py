@@ -45,6 +45,35 @@ def _decode_password(config, section: str) -> str:
     return pw
 
 
+def _outlook_table(df) -> str:
+    """Generates an Outlook-compatible HTML table with full inline styles (no CSS classes)."""
+    th_style = (
+        "border:1px solid #cccccc;padding:6px 10px;text-align:left;"
+        "background-color:#1a3a5c;color:#ffffff;font-family:Arial,sans-serif;font-size:12px;"
+        "white-space:nowrap;"
+    )
+    td_style = (
+        "border:1px solid #cccccc;padding:5px 10px;"
+        "font-family:Arial,sans-serif;font-size:12px;color:#000000;"
+    )
+    td_alt_style = td_style + "background-color:#f2f6fa;"
+
+    headers = "".join(f'<th style="{th_style}">{col}</th>' for col in df.columns)
+    rows = []
+    for i, row in df.iterrows():
+        style = td_alt_style if i % 2 == 0 else td_style
+        cells = "".join(f'<td style="{style}">{v if v == v and v is not None else ""}</td>' for v in row)
+        rows.append(f'<tr>{cells}</tr>')
+
+    return (
+        '<table style="border-collapse:collapse;border:1px solid #cccccc;" '
+        'cellpadding="0" cellspacing="0">'
+        f'<thead><tr>{headers}</tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody>'
+        '</table>'
+    )
+
+
 @register_portal("audible")
 class AudibleModule(BasePortalModule):
 
@@ -208,24 +237,22 @@ class AudibleModule(BasePortalModule):
                     table_data[display] = [""] * len(df_full)
 
             df_mail = pd.DataFrame(table_data)
-            html_table = df_mail.to_html(index=False, border=1)
+            html_table = _outlook_table(df_mail)
 
             count = len(eans)
-            if count == 1:
-                intro = "Here's a new title for you."
-            else:
-                intro = f"Here are {count} new titles for you."
+            intro = "Here's a new title for you." if count == 1 else f"Here are {count} new titles for you."
 
-            body = (
-                f"Categories: Delivery<br><br>"
-                f"Dear Audible team,<br><br>"
-                f"{intro}<br><br>"
-                f"{unique_warnings}<br><br>"
-                f"{html_table}<br><br>"
-                f"Please send me a confirmation that you are processing the data "
-                f"and, if errors occur, an error message immediately.<br><br>"
-                f"Thank you.<br>Bernd"
-            )
+            warn_block = f"<p style='color:#cc0000;font-family:Arial,sans-serif;font-size:13px;'>{unique_warnings}</p>" if unique_warnings.strip() else ""
+
+            body = f"""<div style="font-family:Arial,sans-serif;font-size:13px;color:#000000;">
+<p>Categories: Delivery</p>
+<p>Dear Audible team,</p>
+<p>{intro}</p>
+{warn_block}
+{html_table}
+<p>Please send me a confirmation that you are processing the data and, if errors occur, an error message immediately.</p>
+<p>Thank you.<br>Bernd</p>
+</div>"""
 
             return {
                 "to": "eu-delivery@audible.de; kurzke@audible.de",
