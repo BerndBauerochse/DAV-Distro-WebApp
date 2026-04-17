@@ -13,6 +13,8 @@ import glob
 import logging
 import os
 import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from zipfile import ZipFile
 
@@ -21,6 +23,8 @@ import pandas as pd
 from app.modules.base import BasePortalModule, FileTransfer, ProgressCallback
 from app.modules.ftp_helper import sftp_connection, sftp_upload, sftp_makedirs
 from app.services.delivery_service import register_portal
+
+PARALLEL_UPLOADS = 4  # concurrent SFTP connections for audio files
 
 logger = logging.getLogger(__name__)
 
@@ -123,22 +127,53 @@ class ZebraModule(BasePortalModule):
         return transfers
 
     def ship(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
+        metadata = [t for t in transfers if t.file_type == "metadata"]
+        audio    = [t for t in transfers if t.file_type != "metadata"]
+
+        # progress_cb may be called from multiple threads — wrap with a lock
+        _lock = threading.Lock()
+        def safe_cb(*args, **kwargs):
+            with _lock:
+                progress_cb(*args, **kwargs)
+
+        # 1. Single connection: create all remote directories + upload metadata
+        remote_dirs = {os.path.dirname(t.destination).replace("\\", "/") for t in audio}
         with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
-            for t in transfers:
-                remote_dir = os.path.dirname(t.destination).replace("\\", "/")
-                sftp_makedirs(sftp, remote_dir)
+            for d in sorted(remote_dirs):
+                sftp_makedirs(sftp, d)
+            for t in metadata:
                 try:
-                    progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
-                    sftp_upload(
-                        sftp, t.source_path, t.destination,
-                        progress_cb=lambda cur, tot: progress_cb(
-                            run_id, t.ean, t.file_name, t.file_type, cur, tot, "uploading"
-                        ),
-                    )
-                    progress_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
+                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
+                    sftp_upload(sftp, t.source_path, t.destination,
+                        progress_cb=lambda cur, tot, _t=t: safe_cb(
+                            run_id, _t.ean, _t.file_name, _t.file_type, cur, tot, "uploading"
+                        ))
+                    safe_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
+                except Exception as e:
+                    logger.error(f"Zebra metadata upload failed {t.file_name}: {e}")
+                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+
+        # 2. Upload audio files in parallel — each worker gets its own SFTP connection
+        def _upload_audio(t: FileTransfer):
+            with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
+                try:
+                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
+                    sftp_upload(sftp, t.source_path, t.destination,
+                        progress_cb=lambda cur, tot, _t=t: safe_cb(
+                            run_id, _t.ean, _t.file_name, _t.file_type, cur, tot, "uploading"
+                        ))
+                    safe_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
                 except Exception as e:
                     logger.error(f"Zebra upload failed {t.file_name}: {e}")
-                    progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+
+        with ThreadPoolExecutor(max_workers=PARALLEL_UPLOADS) as pool:
+            futures = {pool.submit(_upload_audio, t): t for t in audio}
+            for fut in as_completed(futures):
+                exc = fut.exception()
+                if exc:
+                    t = futures[fut]
+                    logger.error(f"Zebra worker exception {t.file_name}: {exc}")
 
     def check_missing(self, metadata_path: str | None) -> list[str]:
         if not metadata_path or not os.path.isfile(metadata_path):
