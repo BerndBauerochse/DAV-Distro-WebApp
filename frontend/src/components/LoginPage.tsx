@@ -36,12 +36,9 @@ export function LoginPage({ onLogin }: Props) {
 
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-              style={{ background: 'white', boxShadow: '0 4px 20px rgba(232,0,45,0.4)' }}>
-              <img src="/logo.png" alt="DAV" className="w-8 h-8 object-contain" />
-            </div>
+            <img src="/logo.png" alt="DAV" className="w-10 h-10 object-contain shrink-0" />
             <div>
-              <p style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-100)' }}>DAV Distro</p>
+              <p style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-100)' }}>Der Audio Verlag</p>
               <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Audio Distribution Platform</p>
             </div>
           </div>

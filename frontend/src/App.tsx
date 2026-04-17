@@ -67,12 +67,9 @@ export function App() {
               {/* Logo */}
               <div className="px-5 pt-6 pb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
-                    style={{ background: 'white', boxShadow: '0 4px 16px rgba(232,0,45,0.35)' }}>
-                    <img src="/logo.png" alt="DAV" className="w-7 h-7 object-contain" />
-                  </div>
+                  <img src="/logo.png" alt="DAV" className="w-9 h-9 object-contain shrink-0" />
                   <div>
-                    <p style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em' }}>Distro</p>
+                    <p style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em' }}>Der Audio Verlag</p>
                     <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Audio Distribution</p>
                   </div>
                 </div>
