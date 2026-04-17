@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react'
-import { Upload, Loader2, PackagePlus, Play } from 'lucide-react'
+import { Upload, Loader2, Play } from 'lucide-react'
 import { BatchCard } from './BatchCard'
 import { api } from '../api/client'
 import type { BatchPreview } from '../types'
@@ -24,8 +24,6 @@ export function BatchBuilder({ onStarted }: Props) {
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
     const fileArr = Array.from(files)
-
-    // Add entries with loading state immediately
     const newEntries: BatchEntry[] = fileArr.map(file => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
@@ -33,22 +31,15 @@ export function BatchBuilder({ onStarted }: Props) {
       loading: true,
       error: null,
     }))
-
     setBatches(prev => [...prev, ...newEntries])
-
-    // Parse each file
     await Promise.all(
       newEntries.map(async entry => {
         try {
           const preview = await api.previewMetadata(entry.file)
-          setBatches(prev => prev.map(b =>
-            b.id === entry.id ? { ...b, preview, loading: false } : b
-          ))
+          setBatches(prev => prev.map(b => b.id === entry.id ? { ...b, preview, loading: false } : b))
         } catch (err) {
           setBatches(prev => prev.map(b =>
-            b.id === entry.id
-              ? { ...b, loading: false, error: (err as Error).message }
-              : b
+            b.id === entry.id ? { ...b, loading: false, error: (err as Error).message } : b
           ))
         }
       })
@@ -72,15 +63,9 @@ export function BatchBuilder({ onStarted }: Props) {
       onStarted(run_id)
       setBatches(prev => prev.filter(b => b.id !== id))
     } catch (err) {
-      setBatches(prev => prev.map(b =>
-        b.id === id ? { ...b, error: (err as Error).message } : b
-      ))
+      setBatches(prev => prev.map(b => b.id === id ? { ...b, error: (err as Error).message } : b))
     } finally {
-      setStartingIds(prev => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
+      setStartingIds(prev => { const n = new Set(prev); n.delete(id); return n })
     }
   }
 
@@ -99,17 +84,14 @@ export function BatchBuilder({ onStarted }: Props) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <PackagePlus className="w-4 h-4 text-gray-500" />
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Auslieferung vorbereiten
-          </h2>
+        <div>
+          <h2 className="text-sm font-semibold text-white/70">Auslieferung vorbereiten</h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            Metadatei laden, Portal prüfen, Auslieferung starten
+          </p>
         </div>
         {readyCount > 1 && (
-          <button
-            onClick={handleStartAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors"
-          >
+          <button onClick={handleStartAll} className="btn-accent flex items-center gap-1.5">
             <Play className="w-3.5 h-3.5" />
             Alle starten ({readyCount})
           </button>
@@ -122,11 +104,11 @@ export function BatchBuilder({ onStarted }: Props) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-colors ${
-          dragOver
-            ? 'border-blue-500 bg-blue-50'
-            : 'border-gray-200 hover:border-blue-400 hover:bg-gray-50'
-        }`}
+        className="rounded-2xl p-8 text-center cursor-pointer transition-all duration-200"
+        style={{
+          border: `2px dashed ${dragOver ? 'rgba(34,211,238,0.6)' : 'rgba(255,255,255,0.12)'}`,
+          background: dragOver ? 'rgba(34,211,238,0.06)' : 'rgba(255,255,255,0.025)',
+        }}
       >
         <input
           ref={inputRef}
@@ -136,11 +118,14 @@ export function BatchBuilder({ onStarted }: Props) {
           className="hidden"
           onChange={e => e.target.files && addFiles(e.target.files)}
         />
-        <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-        <p className="text-sm font-medium text-gray-600">
+        <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center"
+          style={{ background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)' }}>
+          <Upload className="w-5 h-5" style={{ color: '#22d3ee' }} />
+        </div>
+        <p className="text-sm font-medium text-white/60">
           Metadateien hierher ziehen oder klicken
         </p>
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
           XML oder Excel — mehrere Dateien gleichzeitig möglich
         </p>
       </div>
@@ -149,35 +134,33 @@ export function BatchBuilder({ onStarted }: Props) {
       {batches.length > 0 && (
         <div className="space-y-3">
           {batches.map(batch => {
-            // Loading skeleton
             if (batch.loading) {
               return (
-                <div key={batch.id} className="bg-white rounded-2xl border border-gray-200 p-5 flex items-center gap-3 text-sm text-gray-500">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-500 shrink-0" />
-                  <span className="truncate">{batch.file.name}</span>
-                  <span className="text-xs text-gray-400">wird analysiert…</span>
+                <div key={batch.id} className="glass-card px-5 py-4 flex items-center gap-3">
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: '#22d3ee' }} />
+                  <span className="text-sm text-white/60 truncate">{batch.file.name}</span>
+                  <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
+                    wird analysiert…
+                  </span>
                 </div>
               )
             }
-
-            // Error state
             if (batch.error || !batch.preview) {
               return (
-                <div key={batch.id} className="bg-white rounded-2xl border border-red-200 p-5 flex items-center justify-between gap-3">
+                <div key={batch.id} className="glass-card px-5 py-4 flex items-center justify-between gap-3"
+                  style={{ borderColor: 'rgba(248,113,113,0.25)' }}>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">{batch.file.name}</p>
-                    <p className="text-xs text-red-500 mt-0.5">{batch.error ?? 'Unbekannter Fehler'}</p>
+                    <p className="text-sm font-medium text-white/70 truncate">{batch.file.name}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#f87171' }}>
+                      {batch.error ?? 'Unbekannter Fehler'}
+                    </p>
                   </div>
-                  <button
-                    onClick={() => handleRemove(batch.id)}
-                    className="text-xs text-gray-400 hover:text-red-500 shrink-0"
-                  >
+                  <button onClick={() => handleRemove(batch.id)} className="btn-ghost text-xs shrink-0">
                     Entfernen
                   </button>
                 </div>
               )
             }
-
             return (
               <BatchCard
                 key={batch.id}

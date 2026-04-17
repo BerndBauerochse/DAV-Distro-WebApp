@@ -10,23 +10,22 @@ interface Props {
 export function ProgressBar({ current, total, status, className }: Props) {
   const pct = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0
 
-  const barColor = clsx({
-    'bg-blue-500': status === 'uploading',
-    'bg-green-500': status === 'success',
-    'bg-red-500': status === 'failed',
-    'bg-gray-400': status === 'skipped' || status === 'pending',
-  })
+  const barStyle: React.CSSProperties =
+    status === 'uploading' ? { background: 'linear-gradient(90deg, #22d3ee, #0ea5e9)' } :
+    status === 'success'   ? { background: 'linear-gradient(90deg, #4ade80, #22c55e)' } :
+    status === 'failed'    ? { background: 'linear-gradient(90deg, #f87171, #ef4444)' } :
+                             { background: 'rgba(255,255,255,0.2)' }
 
   return (
     <div className={clsx('w-full', className)}>
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
+      <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
         <span>{formatBytes(current)} / {formatBytes(total)}</span>
-        <span className="font-medium">{pct}%</span>
+        <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{pct}%</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+      <div className="w-full rounded-full h-1.5 overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
         <div
-          className={clsx('h-2 rounded-full transition-all duration-300', barColor)}
-          style={{ width: `${pct}%` }}
+          className="h-1.5 rounded-full transition-all duration-300"
+          style={{ width: `${pct}%`, ...barStyle }}
         />
       </div>
     </div>

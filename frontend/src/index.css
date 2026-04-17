@@ -1,9 +1,261 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS Variables ───────────────────────────────────────────── */
+:root {
+  --glass-bg:       rgba(255,255,255,0.05);
+  --glass-bg-hover: rgba(255,255,255,0.08);
+  --glass-border:   rgba(255,255,255,0.09);
+  --glass-shadow:   0 8px 32px rgba(0,0,0,0.4);
+
+  --card-bg:        rgba(12,16,40,0.55);
+  --card-border:    rgba(255,255,255,0.08);
+
+  --sidebar-bg:     rgba(8,10,28,0.75);
+
+  --accent:         #22d3ee;   /* cyan */
+  --accent-glow:    rgba(34,211,238,0.2);
+  --accent2:        #a78bfa;   /* violet */
+
+  --text-primary:   rgba(255,255,255,0.92);
+  --text-secondary: rgba(255,255,255,0.55);
+  --text-muted:     rgba(255,255,255,0.32);
+
+  --success:        #4ade80;
+  --error:          #f87171;
+  --warning:        #fbbf24;
+  --info:           #60a5fa;
+}
+
+/* ── Base ────────────────────────────────────────────────────── */
 @layer base {
+  * { box-sizing: border-box; }
+
   body {
-    @apply antialiased text-gray-900;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
   }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+}
+
+/* ── Night Sky Background ────────────────────────────────────── */
+.app-bg {
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Static image (if bg.jpg placed in /frontend/bg.jpg -> served as /bg.jpg) */
+.app-bg::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image: url('/bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Fallback gradient when image is absent */
+  background-color: #070b1a;
+}
+
+/* Gradient sky — always visible, enhances image or stands alone */
+.app-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    /* Stars shimmer */
+    radial-gradient(ellipse 60% 40% at 15% 8%, rgba(167,139,250,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 35% at 80% 5%, rgba(34,211,238,0.10) 0%, transparent 50%),
+    /* Dark overlay for readability */
+    linear-gradient(175deg,
+      rgba(6,4,20,0.50) 0%,
+      rgba(8,6,24,0.45) 40%,
+      rgba(4,8,20,0.60) 70%,
+      rgba(2,4,12,0.80) 100%
+    );
+}
+
+/* ── Glass Components ────────────────────────────────────────── */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--card-border);
+    border-radius: 1.25rem;
+    box-shadow: var(--glass-shadow);
+  }
+
+  .glass-sidebar {
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border-right: 1px solid var(--glass-border);
+  }
+
+  /* Interactive rows / items */
+  .glass-row {
+    transition: background 0.15s ease;
+  }
+  .glass-row:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  /* Accent button */
+  .btn-accent {
+    background: linear-gradient(135deg, #22d3ee 0%, #0ea5e9 100%);
+    color: #0a1020;
+    font-weight: 600;
+    border-radius: 0.625rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    transition: all 0.15s ease;
+    box-shadow: 0 0 16px rgba(34,211,238,0.25);
+  }
+  .btn-accent:hover {
+    box-shadow: 0 0 24px rgba(34,211,238,0.40);
+    transform: translateY(-1px);
+  }
+  .btn-accent:disabled {
+    opacity: 0.45;
+    transform: none;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text-secondary);
+    border-radius: 0.625rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    transition: all 0.15s ease;
+  }
+  .btn-ghost:hover {
+    background: rgba(255,255,255,0.10);
+    color: var(--text-primary);
+  }
+
+  /* Input fields */
+  .glass-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text-primary);
+    border-radius: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    outline: none;
+  }
+  .glass-input::placeholder { color: var(--text-muted); }
+  .glass-input:focus {
+    border-color: rgba(34,211,238,0.5);
+    background: rgba(255,255,255,0.08);
+  }
+
+  /* Select fields */
+  .glass-select {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: var(--text-primary);
+    border-radius: 0.625rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.875rem;
+    outline: none;
+    cursor: pointer;
+  }
+  .glass-select:focus { border-color: rgba(34,211,238,0.5); }
+  .glass-select option { background: #101830; color: white; }
+
+  /* Section labels */
+  .section-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* KPI value */
+  .kpi-number {
+    font-size: 1.875rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-primary);
+  }
+
+  /* Cyan glow accent line */
+  .accent-line {
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+    border-radius: 99px;
+  }
+
+  /* Active nav glow */
+  .nav-active {
+    background: rgba(34,211,238,0.12);
+    border: 1px solid rgba(34,211,238,0.18);
+    color: #22d3ee;
+  }
+
+  /* Vignette overlay */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: radial-gradient(ellipse 120% 120% at 50% 50%, transparent 50%, rgba(2,4,12,0.55) 100%);
+  }
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(34,211,238,0.3); }
+  50%       { box-shadow: 0 0 18px rgba(34,211,238,0.6); }
+}
+
+.fade-in { animation: fadeIn 0.25s ease forwards; }
+
+.skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+  border-radius: 0.5rem;
 }
