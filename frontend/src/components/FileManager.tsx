@@ -26,20 +26,40 @@ function fmtDate(ts: number) {
   })
 }
 
-/** Authenticated image thumbnail */
-function AuthImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+/** Authenticated thumbnail — lazy-loads only when visible, fetches thumb endpoint */
+function AuthImage({ filename, alt, className }: { filename: string; alt: string; className?: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
+    const el = ref.current
+    if (!el) return
     let url: string | null = null
-    const { token } = getStoredAuth()
-    fetch(src, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then(r => r.ok ? r.blob() : Promise.reject())
-      .then(blob => { url = URL.createObjectURL(blob); setBlobUrl(url) })
-      .catch(() => {})
-    return () => { if (url) URL.revokeObjectURL(url) }
-  }, [src])
-  if (!blobUrl) return <div className={`skeleton ${className ?? ''}`} />
-  return <img src={blobUrl} alt={alt} className={className} />
+    let cancelled = false
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return
+      observer.disconnect()
+      const { token } = getStoredAuth()
+      const thumbUrl = `/api/files/covers/${encodeURIComponent(filename)}/thumb`
+      fetch(thumbUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+        .then(r => r.ok ? r.blob() : Promise.reject())
+        .then(blob => { if (!cancelled) { url = URL.createObjectURL(blob); setBlobUrl(url) } })
+        .catch(() => {})
+    }, { rootMargin: '100px' })
+
+    observer.observe(el)
+    return () => { cancelled = true; observer.disconnect(); if (url) URL.revokeObjectURL(url) }
+  }, [filename])
+
+  return (
+    <div ref={ref} className={className}>
+      {blobUrl
+        ? <img src={blobUrl} alt={alt} className="w-full h-full object-cover" />
+        : <div className={`skeleton w-full h-full`} />
+      }
+    </div>
+  )
 }
 
 function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
@@ -202,8 +222,8 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
                 }}
                 onClick={() => toggleSelect(f.name)}
               >
-                <AuthImage src={api.getFileDownloadUrl('covers', f.name)} alt={f.name}
-                  className="w-full aspect-square object-cover" />
+                <AuthImage filename={f.name} alt={f.name}
+                  className="w-full aspect-square overflow-hidden" />
                 {/* Select indicator */}
                 <div className="absolute top-1.5 left-1.5">
                   {selected.has(f.name)

@@ -3,15 +3,18 @@ File Manager: list, upload, delete files in /storage/{zips,toc,pdf,covers}
 Uploads use chunked transfer to work around proxy body-size/timeout limits.
 """
 import os
+import asyncio
 import aiofiles
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from app.auth import get_current_user
 
-READ_SIZE = 1024 * 1024       # 1 MB read buffer
-CHUNK_TEMP = Path("/tmp/dav-chunks")
+READ_SIZE   = 1024 * 1024           # 1 MB read buffer
+CHUNK_TEMP  = Path("/tmp/dav-chunks")
+THUMB_CACHE = Path("/tmp/dav-thumbs")
+THUMB_SIZE  = 200                    # max width/height in pixels
 
 STORAGE_ROOT = Path(os.getenv("STORAGE_DIR", "/storage"))
 
@@ -112,6 +115,34 @@ async def upload_chunk(
         )
 
     return FileEntry(name=dest.name, size=stat.st_size, modified=stat.st_mtime)
+
+
+# ── Cover Thumbnail ───────────────────────────────────────────────────────────
+
+def _make_thumb(src: Path, dest: Path) -> None:
+    """Resize image to THUMB_SIZE × THUMB_SIZE (max), save as JPEG. Blocking — run in thread."""
+    from PIL import Image
+    with Image.open(src) as img:
+        img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.LANCZOS)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        img.convert("RGB").save(dest, "JPEG", quality=75, optimize=True)
+
+@router.get("/covers/{filename}/thumb")
+async def cover_thumbnail(filename: str, _user: str = Depends(get_current_user)):
+    folder = _category_path("covers")
+    src = folder / filename
+    if not src.exists() or not src.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    thumb = THUMB_CACHE / filename
+    # Regenerate if missing or source is newer
+    if not thumb.exists() or src.stat().st_mtime > thumb.stat().st_mtime:
+        await asyncio.to_thread(_make_thumb, src, thumb)
+
+    data = thumb.read_bytes()
+    return Response(content=data, media_type="image/jpeg", headers={
+        "Cache-Control": "public, max-age=86400",
+    })
 
 
 # ── Download ──────────────────────────────────────────────────────────────────
