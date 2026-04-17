@@ -23,8 +23,8 @@ class RTLModule(BasePortalModule):
         self.username = self._get(sec, "sftp_username", "dav")
         pw_b64 = self._get(sec, "sftp_password_base64")
         self.password = base64.b64decode(pw_b64).decode() if pw_b64 else self._get(sec, "sftp_password")
-        # Remote directory on the SFTP server (e.g. "/incoming" or "/" for root)
-        self.remote_dir = self._get(sec, "remote_dir", "/")
+        # Remote directory on the SFTP server
+        self.remote_dir = self._get(sec, "remote_dir", "/audiobooks-prod-ingestion-bucket/dav")
 
     def _remote_path(self, filename: str) -> str:
         base = self.remote_dir.rstrip("/")

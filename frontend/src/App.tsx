@@ -76,11 +76,11 @@ export function App() {
           </div>
         </header>
 
-        {/* Main */}
+        {/* Main — all pages stay mounted so local state (batches, uploads) survives tab switches */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
-          {page === 'dashboard' && <Dashboard />}
-          {page === 'history' && <History />}
-          {page === 'files' && <FileManager />}
+          <div className={page !== 'dashboard' ? 'hidden' : ''}><Dashboard /></div>
+          <div className={page !== 'history'   ? 'hidden' : ''}><History /></div>
+          <div className={page !== 'files'     ? 'hidden' : ''}><FileManager /></div>
         </main>
       </div>
     </UploadProvider>
