@@ -36,9 +36,9 @@ export function LoginPage({ onLogin }: Props) {
 
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: 'linear-gradient(135deg,#e8002d,#8b0013)', boxShadow: '0 4px 20px rgba(232,0,45,0.4)' }}>
-              <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, color: 'white', fontSize: '12px', letterSpacing: '0.04em' }}>DAV</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+              style={{ background: 'white', boxShadow: '0 4px 20px rgba(232,0,45,0.4)' }}>
+              <img src="/logo.png" alt="DAV" className="w-8 h-8 object-contain" />
             </div>
             <div>
               <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-100)' }}>DAV Distro</p>

@@ -67,9 +67,9 @@ export function App() {
               {/* Logo */}
               <div className="px-5 pt-6 pb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                    style={{ background: 'linear-gradient(135deg,#e8002d 0%,#8b0013 100%)', boxShadow: '0 4px 16px rgba(232,0,45,0.35)' }}>
-                    <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 800, color: 'white', fontSize: '11px', letterSpacing: '0.05em' }}>DAV</span>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 overflow-hidden"
+                    style={{ background: 'white', boxShadow: '0 4px 16px rgba(232,0,45,0.35)' }}>
+                    <img src="/logo.png" alt="DAV" className="w-7 h-7 object-contain" />
                   </div>
                   <div>
                     <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em' }}>Distro</p>
