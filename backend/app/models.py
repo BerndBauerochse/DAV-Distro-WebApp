@@ -58,3 +58,11 @@ class DeliveryLog(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     run: Mapped["DeliveryRun"] = relationship(back_populates="logs")
+
+
+class UserSettings(Base):
+    __tablename__ = "user_settings"
+
+    username: Mapped[str] = mapped_column(String, primary_key=True)
+    # base64 data-URL of the user's avatar image, stored as text
+    avatar_data: Mapped[str | None] = mapped_column(Text)

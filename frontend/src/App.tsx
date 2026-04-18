@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { LayoutDashboard, History as HistoryIcon, FolderOpen, LogOut, Camera } from 'lucide-react'
 import { Dashboard } from './components/Dashboard'
@@ -6,7 +6,10 @@ import { History } from './components/History'
 import { FileManager } from './components/FileManager'
 import { LoginPage } from './components/LoginPage'
 import { useAuth } from './hooks/useAuth'
+import { getStoredAuth } from './hooks/useAuth'
 import { UploadProvider } from './contexts/UploadContext'
+
+const APP_VERSION = '1.3'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
@@ -26,16 +29,67 @@ const PAGE_TITLES: Record<Page, { title: string; sub: string }> = {
   files:     { title: 'Dateiverwaltung', sub: 'ZIPs, Metadaten, Covers auf dem Server' },
 }
 
-function useAvatar() {
+/** Resize image to max 256×256 via canvas before storing (keeps DB size small). */
+function resizeAvatar(dataUrl: string): Promise<string> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const size = 256
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = size
+      const ctx = canvas.getContext('2d')!
+      const scale = Math.min(size / img.width, size / img.height)
+      const w = img.width * scale, h = img.height * scale
+      ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.85))
+    }
+    img.src = dataUrl
+  })
+}
+
+function useAvatar(username: string | undefined) {
   const [avatar, setAvatarState] = useState<string | null>(() => localStorage.getItem('dav_avatar'))
-  const set = (dataUrl: string) => { localStorage.setItem('dav_avatar', dataUrl); setAvatarState(dataUrl) }
+
+  // Sync from server whenever the user logs in
+  useEffect(() => {
+    if (!username) return
+    const { token } = getStoredAuth()
+    fetch('/api/users/me/avatar', {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.avatar_data) {
+          localStorage.setItem('dav_avatar', data.avatar_data)
+          setAvatarState(data.avatar_data)
+        }
+      })
+      .catch(() => {})
+  }, [username])
+
+  const set = async (dataUrl: string) => {
+    const resized = await resizeAvatar(dataUrl)
+    localStorage.setItem('dav_avatar', resized)
+    setAvatarState(resized)
+    // Persist to server so all devices see the same avatar
+    const { token } = getStoredAuth()
+    fetch('/api/users/me/avatar', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ avatar_data: resized }),
+    }).catch(() => {})
+  }
+
   return { avatar, set }
 }
 
 export function App() {
   const { auth, login, logout } = useAuth()
   const [page, setPage] = useState<Page>('dashboard')
-  const { avatar, set: setAvatar } = useAvatar()
+  const { avatar, set: setAvatar } = useAvatar(auth.username)
   const avatarRef = useRef<HTMLInputElement>(null)
 
   function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
@@ -150,6 +204,13 @@ export function App() {
                     <LogOut className="w-3.5 h-3.5" />
                   </button>
                 </div>
+              </div>
+
+              {/* Version */}
+              <div className="px-5 pb-4 text-center">
+                <span style={{ fontSize: '0.625rem', color: 'var(--text-400)', letterSpacing: '0.06em' }}>
+                  v{APP_VERSION}
+                </span>
               </div>
             </aside>
 
