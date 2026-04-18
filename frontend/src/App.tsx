@@ -10,7 +10,7 @@ import { useAuth, getStoredAuth } from './hooks/useAuth'
 import { UploadProvider } from './contexts/UploadContext'
 import type { MailDraft } from './types'
 
-const APP_VERSION = '1.3'
+const APP_VERSION = '1.4'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
