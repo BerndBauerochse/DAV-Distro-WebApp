@@ -7,6 +7,7 @@ import logging
 import configparser
 import os
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -184,6 +185,8 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
         # Track which files have been started by progress_cb (to detect unprocessed ones)
         processed_file_names: set[str] = set()
+        # Throttle: file_name -> monotonic timestamp of last "uploading" broadcast
+        _last_ws_time: dict[str, float] = {}
 
         def progress_cb(run_id, ean, file_name, file_type, current, total_bytes, status, error=None):
             nonlocal completed, failed, skipped
@@ -210,6 +213,14 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
                 "error_log": error,
                 "finished_at": datetime.now(timezone.utc) if status in ("success", "failed", "skipped") else None,
             })
+
+            # Throttle "uploading" WS broadcasts to max 1 per second per file.
+            # Terminal statuses (success/failed/skipped) are always sent.
+            if status == "uploading":
+                now_t = time.monotonic()
+                if now_t - _last_ws_time.get(file_name, 0) < 1.0:
+                    return  # skip this broadcast, counters already updated above
+                _last_ws_time[file_name] = now_t
 
             asyncio.run_coroutine_threadsafe(
                 ws_manager.broadcast({

@@ -63,7 +63,12 @@ export function Dashboard() {
         const run = prev.get(event.run_id)
         if (!run) return prev
         const next = new Map(prev)
-        next.set(event.run_id, { ...run })
+        next.set(event.run_id, {
+          ...run,
+          completed_files: run.completed_files + (event.status === 'success' ? 1 : 0),
+          failed_files:    run.failed_files    + (event.status === 'failed'  ? 1 : 0),
+          skipped_files:   run.skipped_files   + (event.status === 'skipped' ? 1 : 0),
+        })
         return next
       })
       setTransfers(prev => {
