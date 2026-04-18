@@ -42,6 +42,21 @@ services:
     environment:
       - SERVICE_FQDN_FRONTEND_80
 
+  # ── SFTP-Upload-Server ───────────────────────────────────────────────────────
+  # Zugang: sftp <user>@<host> -p <SFTP_PORT>
+  # Verzeichnisse im SFTP:
+  #   /zips     → SOURCE_DIR  (Audiobook-ZIPs)
+  #   /storage  → STORAGE_DIR (toc/, covers/, pdf/ …)
+  sftp:
+    image: atmoz/sftp:latest
+    restart: unless-stopped
+    ports:
+      - "${SFTP_PORT:-2222}:22"
+    volumes:
+      - ${SOURCE_DIR:-/data/source}:/home/${SFTP_USER:-dav-upload}/zips
+      - ${STORAGE_DIR:-/opt/dav-storage}:/home/${SFTP_USER:-dav-upload}/storage
+    command: "${SFTP_USER:-dav-upload}:${SFTP_PASSWORD:-changeme-sftp}:1000"
+
 volumes:
   postgres_data:
   uploads:
