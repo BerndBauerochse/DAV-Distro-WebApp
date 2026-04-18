@@ -5,8 +5,7 @@ import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
 import { FileManager } from './components/FileManager'
 import { LoginPage } from './components/LoginPage'
-import { useAuth } from './hooks/useAuth'
-import { getStoredAuth } from './hooks/useAuth'
+import { useAuth, getStoredAuth } from './hooks/useAuth'
 import { UploadProvider } from './contexts/UploadContext'
 
 const APP_VERSION = '1.3'
@@ -47,7 +46,7 @@ function resizeAvatar(dataUrl: string): Promise<string> {
   })
 }
 
-function useAvatar(username: string | undefined) {
+function useAvatar(username: string | null) {
   const [avatar, setAvatarState] = useState<string | null>(() => localStorage.getItem('dav_avatar'))
 
   // Sync from server whenever the user logs in
