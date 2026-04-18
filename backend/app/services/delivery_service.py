@@ -224,16 +224,21 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             elif status == "skipped":
                 skipped += 1
 
-            log_records.append({
-                "run_id": uuid.UUID(run_id),
-                "portal": portal_key,
-                "ean": ean,
-                "file_type": file_type,
-                "file_name": file_name,
-                "status": status,
-                "error_log": error,
-                "finished_at": datetime.now(timezone.utc) if status in ("success", "failed", "skipped") else None,
-            })
+            # Only record terminal statuses — "uploading" ticks are transient,
+            # never displayed in History, and would bloat log_records to tens of
+            # thousands of rows per file (one per SFTP chunk), causing a massive
+            # DB flush that blocks the event loop and delays the final WS message.
+            if status in ("success", "failed", "skipped"):
+                log_records.append({
+                    "run_id": uuid.UUID(run_id),
+                    "portal": portal_key,
+                    "ean": ean,
+                    "file_type": file_type,
+                    "file_name": file_name,
+                    "status": status,
+                    "error_log": error,
+                    "finished_at": datetime.now(timezone.utc),
+                })
 
             # Throttle "uploading" WS broadcasts to max 1 per second per file.
             # Terminal statuses (success/failed/skipped) are always sent.
