@@ -4,7 +4,7 @@ Each module must implement get_files() and ship().
 Progress is reported via the progress_callback.
 """
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 import configparser
 
@@ -17,6 +17,9 @@ class FileTransfer:
     source_path: str
     destination: str
     file_size_bytes: int = 0
+    # Files injected into the ZIP before upload: list of (filename, type)
+    # type is "toc" for TOC XLSX files, "pdf" for booklet PDFs
+    injected_files: list[tuple[str, str]] = field(default_factory=list)
 
 
 ProgressCallback = Callable[[str, str, str, str, int, int, str, str | None], None]

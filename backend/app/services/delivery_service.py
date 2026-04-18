@@ -164,6 +164,27 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
                 "Keine Dateien gefunden. Bitte XML-Datei und Quellverzeichnis prüfen."
             )
 
+        # Log injected files (TOCs, PDFs) immediately so they appear in history
+        # even if the upload later fails.
+        now = datetime.now(timezone.utc)
+        injection_logs = [
+            {
+                "run_id": run_id,
+                "portal": portal_key,
+                "ean": t.ean,
+                "file_type": inj_type,
+                "file_name": inj_name,
+                "status": "success",
+                "finished_at": now,
+            }
+            for t in transfers
+            for (inj_name, inj_type) in t.injected_files
+        ]
+        if injection_logs:
+            asyncio.run_coroutine_threadsafe(
+                _insert_logs(db_session_factory, injection_logs), loop
+            ).result()
+
         # Update total_files
         asyncio.run_coroutine_threadsafe(
             _update_run_counts(db_session_factory, run_id, total, 0, 0, 0), loop

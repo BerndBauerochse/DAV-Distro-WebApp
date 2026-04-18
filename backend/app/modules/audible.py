@@ -130,7 +130,7 @@ class AudibleModule(BasePortalModule):
             shutil.copy2(zip_src, zip_dest)
 
             # TOC-Dateien in ZIP einfügen
-            self._inject_toc(zip_dest, ean)
+            injected = self._inject_toc(zip_dest, ean)
 
             transfers.append(FileTransfer(
                 ean=ean,
@@ -139,6 +139,7 @@ class AudibleModule(BasePortalModule):
                 source_path=zip_dest,
                 destination=f"{self.remote_path}{os.path.basename(zip_dest)}",
                 file_size_bytes=os.path.getsize(zip_dest),
+                injected_files=[(name, "toc") for name in injected],
             ))
 
         # Mail-Entwurf vorbereiten
@@ -191,20 +192,24 @@ class AudibleModule(BasePortalModule):
             logger.error(f"Audible: Excel-Lesefehler: {e}")
             return []
 
-    def _inject_toc(self, zip_path: str, ean: str) -> None:
-        """Sucht TOC-Dateien (*{ean}*.xlsx) und fügt sie unter {ean}/ in die ZIP ein."""
+    def _inject_toc(self, zip_path: str, ean: str) -> list[str]:
+        """Sucht TOC-Dateien (*{ean}*.xlsx) und fügt sie unter {ean}/ in die ZIP ein.
+        Gibt die Liste der eingefügten Dateinamen zurück."""
         toc_files = glob.glob(os.path.join(self.toc_folder, f"*{ean}*.xlsx"))
         if not toc_files:
             logger.info(f"Audible: Keine TOC-Datei für {ean} gefunden — ZIP unverändert")
-            return
+            return []
+        injected: list[str] = []
         try:
             with zipfile.ZipFile(zip_path, "a") as zf:
                 for toc_file in toc_files:
                     arcname = f"{ean}/{os.path.basename(toc_file)}"
                     zf.write(toc_file, arcname=arcname)
+                    injected.append(os.path.basename(toc_file))
                     logger.info(f"Audible: TOC eingefügt: {os.path.basename(toc_file)} → {arcname}")
         except Exception as e:
             logger.error(f"Audible: Fehler beim TOC-Einfügen in {zip_path}: {e}")
+        return injected
 
     def _build_mail_data(self, excel_path: str, eans: list[str]) -> dict | None:
         """Baut den Mail-Entwurf mit HTML-Tabelle und Metadaten-Prüfung."""

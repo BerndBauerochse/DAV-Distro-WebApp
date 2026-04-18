@@ -76,7 +76,7 @@ class BookwireModule(BasePortalModule):
 
             # Copy/transform to export dir
             zip_dest = os.path.join(self.export_dir, f"{ean}.zip")
-            self._prepare_zip(zip_src, zip_dest, ean)
+            pdf_injected = self._prepare_zip(zip_src, zip_dest, ean)
 
             transfers.append(FileTransfer(
                 ean=ean,
@@ -85,6 +85,7 @@ class BookwireModule(BasePortalModule):
                 source_path=zip_dest,
                 destination=f"{self.remote_dir}/{ean}.zip",
                 file_size_bytes=os.path.getsize(zip_dest),
+                injected_files=[(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [],
             ))
 
         return transfers
@@ -144,9 +145,10 @@ class BookwireModule(BasePortalModule):
             return []
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
-    def _prepare_zip(self, src: str, dest: str, ean: str) -> None:
+    def _prepare_zip(self, src: str, dest: str, ean: str) -> bool:
         """Kopiert ZIP in export_dir. Wenn eine PDF mit gleicher EAN in pdf_dir liegt:
-        ZIP entpacken, PDF als {ean}_booklet.pdf einfügen, neu packen."""
+        ZIP entpacken, PDF als {ean}_booklet.pdf einfügen, neu packen.
+        Gibt True zurück wenn eine PDF eingefügt wurde, sonst False."""
         import shutil
         import tempfile
 
@@ -156,7 +158,7 @@ class BookwireModule(BasePortalModule):
             # Keine PDF → einfach kopieren
             if src != dest:
                 shutil.copy2(src, dest)
-            return
+            return False
 
         # PDF vorhanden → ZIP entpacken, PDF einfügen, neu packen
         logger.info(f"Bookwire: PDF gefunden für {ean} — wird in ZIP eingefügt: {pdf_src}")
@@ -177,6 +179,7 @@ class BookwireModule(BasePortalModule):
                         new_zip.write(full_path, arcname=arcname)
 
         logger.info(f"Bookwire: ZIP neu gepackt mit {ean}_booklet.pdf: {os.path.basename(dest)}")
+        return True
 
 
 @register_portal("bookwire_moa")

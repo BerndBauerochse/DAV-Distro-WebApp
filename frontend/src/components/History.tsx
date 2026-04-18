@@ -287,14 +287,18 @@ function LogTable({ logs }: { logs: DeliveryLog[] }) {
                 <td className="py-2 pr-4 font-mono" style={{ color: 'var(--text-secondary)' }}>{log.ean ?? '—'}</td>
                 <td className="py-2 pr-4 max-w-xs">
                   <div className="flex items-center gap-1">
-                    {log.file_type === 'metadata' ? <FileText  className="w-3 h-3 shrink-0" style={{ color: '#a78bfa' }} />
-                    : log.file_type === 'system'  ? <Settings  className="w-3 h-3 shrink-0" style={{ color: '#fb923c' }} />
-                    : log.file_type === 'cover'   ? <Image     className="w-3 h-3 shrink-0" style={{ color: '#4ade80' }} />
-                    :                               <FileArchive className="w-3 h-3 shrink-0" style={{ color: '#22d3ee' }} />}
+                    {log.file_type === 'metadata'   ? <FileText       className="w-3 h-3 shrink-0" style={{ color: '#a78bfa' }} />
+                    : log.file_type === 'system'   ? <Settings       className="w-3 h-3 shrink-0" style={{ color: '#fb923c' }} />
+                    : log.file_type === 'cover'    ? <Image          className="w-3 h-3 shrink-0" style={{ color: '#4ade80' }} />
+                    : log.file_type === 'toc'      ? <FileSpreadsheet className="w-3 h-3 shrink-0" style={{ color: '#fbbf24' }} />
+                    : log.file_type === 'pdf'      ? <FileText       className="w-3 h-3 shrink-0" style={{ color: '#fb923c' }} />
+                    :                               <FileArchive     className="w-3 h-3 shrink-0" style={{ color: '#22d3ee' }} />}
                     <span className="truncate text-white/70">{log.file_name ?? '—'}</span>
                   </div>
                 </td>
-                <td className="py-2 pr-4" style={{ color: 'var(--text-muted)' }}>{log.file_type}</td>
+                <td className="py-2 pr-4" style={{ color: 'var(--text-muted)' }}>
+                  {log.file_type === 'toc' ? '📋 TOC' : log.file_type === 'pdf' ? '📄 PDF' : log.file_type}
+                </td>
                 <td className="py-2 pr-4 max-w-xs truncate font-mono" style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
                   {log.destination ?? '—'}
                 </td>
