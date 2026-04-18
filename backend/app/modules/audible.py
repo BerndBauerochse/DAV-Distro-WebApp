@@ -35,6 +35,12 @@ _REQUIRED_COLS = [
     "Audiobook Copyright Year (yyyy)",
 ]
 
+_MAIL_END = (
+    "<p>Please send me a confirmation that you are processing the data and, "
+    "if errors occur, an error message immediately.</p>"
+    "<p>Thank you.<br>Bernd</p>"
+)
+
 
 def _decode_password(config, section: str) -> str:
     pw = config.get(section, "sftp_password", fallback="") or config.get(section, "password", fallback="")
@@ -43,6 +49,17 @@ def _decode_password(config, section: str) -> str:
         if enc:
             pw = base64.b64decode(enc).decode()
     return pw
+
+
+def _find_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    """Case-insensitive, whitespace-stripped column name lookup."""
+    cols_lower = {c.lower().strip(): c for c in df.columns}
+    for c in candidates:
+        if c in df.columns:
+            return c
+        if c.lower().strip() in cols_lower:
+            return cols_lower[c.lower().strip()]
+    return None
 
 
 def _outlook_table(df) -> str:
@@ -72,6 +89,24 @@ def _outlook_table(df) -> str:
         f'<tbody>{"".join(rows)}</tbody>'
         '</table>'
     )
+
+
+def _build_audible_table(df_full: pd.DataFrame) -> str:
+    """Builds the standard Audible mail table with English column headers."""
+    col_map = {
+        "Title": ["Title", "title"],
+        "Unique identifier (ISBN/EAN)": [_AUDIBLE_ISBN_COL, "EAN", "ISBN"],
+        "Running time (in minutes)": ["Length in minutes", "Running time (in minutes)", "Length (minutes)"],
+        "Release date": [
+            "Release date", "Audiobook pub date (mm/dd/yyyy)",
+            "Audiobook Pub Date (MM/DD/YYYY)", "Pub date", "Publication Date",
+        ],
+    }
+    table_data = {}
+    for display, candidates in col_map.items():
+        found = _find_col(df_full, candidates)
+        table_data[display] = df_full[found].tolist() if found is not None else [""] * len(df_full)
+    return _outlook_table(pd.DataFrame(table_data))
 
 
 @register_portal("audible")
@@ -125,11 +160,9 @@ class AudibleModule(BasePortalModule):
                 logger.warning(f"Audible: ZIP nicht gefunden für EAN {ean}")
                 continue
 
-            # ZIP mit Datum-Suffix in export_dir kopieren
             zip_dest = os.path.join(self.export_dir, f"{ean}{date_suffix}.zip")
             shutil.copy2(zip_src, zip_dest)
 
-            # TOC-Dateien in ZIP einfügen
             injected = self._inject_toc(zip_dest, ean)
 
             transfers.append(FileTransfer(
@@ -193,8 +226,7 @@ class AudibleModule(BasePortalModule):
             return []
 
     def _inject_toc(self, zip_path: str, ean: str) -> list[str]:
-        """Sucht TOC-Dateien (*{ean}*.xlsx) und fügt sie unter {ean}/ in die ZIP ein.
-        Gibt die Liste der eingefügten Dateinamen zurück."""
+        """Sucht TOC-Dateien (*{ean}*.xlsx) und fügt sie unter {ean}/ in die ZIP ein."""
         toc_files = glob.glob(os.path.join(self.toc_folder, f"*{ean}*.xlsx"))
         if not toc_files:
             logger.info(f"Audible: Keine TOC-Datei für {ean} gefunden — ZIP unverändert")
@@ -212,7 +244,10 @@ class AudibleModule(BasePortalModule):
         return injected
 
     def _build_mail_data(self, excel_path: str, eans: list[str]) -> dict | None:
-        """Baut den Mail-Entwurf mit HTML-Tabelle und Metadaten-Prüfung."""
+        """
+        Standard-Audible-Mailvorlage.
+        Spalten und Text entsprechen der alten Desktop-App exakt.
+        """
         try:
             df_full = pd.read_excel(excel_path)
 
@@ -225,39 +260,25 @@ class AudibleModule(BasePortalModule):
                     warnings.append(f'Metadaten von "{title}" unvollständig.')
             unique_warnings = "<br>".join(set(warnings))
 
-            # Tabellenspalten für die Mail
-            col_map = {
-                "Title": ["Title", "title"],
-                "ISBN/EAN": [_AUDIBLE_ISBN_COL, "EAN", "ISBN"],
-                "Laufzeit (Min.)": ["Length in minutes", "Running time (in minutes)"],
-                "Veröffentlichung": ["Release date", "Audiobook pub date (mm/dd/yyyy)"],
-            }
-            table_data = {}
-            for display, candidates in col_map.items():
-                for c in candidates:
-                    if c in df_full.columns:
-                        table_data[display] = df_full[c].tolist()
-                        break
-                else:
-                    table_data[display] = [""] * len(df_full)
+            html_table = _build_audible_table(df_full)
 
-            df_mail = pd.DataFrame(table_data)
-            html_table = _outlook_table(df_mail)
+            warn_block = (
+                f"<p style='color:#cc0000;font-family:Arial,sans-serif;font-size:13px;'>{unique_warnings}</p>"
+                if unique_warnings.strip() else ""
+            )
 
-            count = len(eans)
-            intro = "Here's a new title for you." if count == 1 else f"Here are {count} new titles for you."
-
-            warn_block = f"<p style='color:#cc0000;font-family:Arial,sans-serif;font-size:13px;'>{unique_warnings}</p>" if unique_warnings.strip() else ""
-
-            body = f"""<div style="font-family:Arial,sans-serif;font-size:13px;color:#000000;">
-<p>Categories: Delivery</p>
-<p>Dear Audible team,</p>
-<p>{intro}</p>
-{warn_block}
-{html_table}
-<p>Please send me a confirmation that you are processing the data and, if errors occur, an error message immediately.</p>
-<p>Thank you.<br>Bernd</p>
-</div>"""
+            body = (
+                '<div style="font-family:Arial,sans-serif;font-size:13px;color:#000000;">'
+                "<p>Categories: Delivery</p>"
+                "<p>Dear Audible team,</p>"
+                "<p>Here's a new title for you.<br><br>"
+                "Here are a few new titles for you. <br>"
+                "The exclusive titles are marked in green.</p>"
+                f"{warn_block}"
+                f"{html_table}"
+                f"{_MAIL_END}"
+                "</div>"
+            )
 
             return {
                 "to": "eu-delivery@audible.de; kurzke@audible.de",
@@ -276,7 +297,6 @@ class AudibleMoAModule(BasePortalModule):
     Audible MoA (Meldung ohne Audio).
     - Excel-Metadatei → /metadata/{filename}
     - Cover ({ean}.jpg) aus STORAGE_DIR/covers → /{ean}/{ean}.jpg
-      (Ordner /{ean}/ wird auf dem Server angelegt falls nicht vorhanden)
     """
 
     def __init__(self, config, portal_name):
@@ -288,6 +308,8 @@ class AudibleMoAModule(BasePortalModule):
         self.password = _decode_password(config, sec)
         self.metadata_remote = self._get(sec, "remote_path", "/metadata/")
         self.covers_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "covers")
+        self._metadata_path: str | None = None
+        self._cover_eans: list[str] = []
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         transfers: list[FileTransfer] = []
@@ -295,6 +317,9 @@ class AudibleMoAModule(BasePortalModule):
         if not metadata_path or not os.path.isfile(metadata_path):
             logger.warning("Audible MoA: Keine Metadatei angegeben.")
             return transfers
+
+        self._metadata_path = metadata_path
+        self._cover_eans = []
 
         # Excel → /metadata/
         transfers.append(FileTransfer(
@@ -313,6 +338,7 @@ class AudibleMoAModule(BasePortalModule):
             if not os.path.isfile(jpg_path):
                 logger.warning(f"Audible MoA: Cover nicht gefunden für {ean}: {jpg_path}")
                 continue
+            self._cover_eans.append(ean)
             transfers.append(FileTransfer(
                 ean=ean,
                 file_name=f"{ean}.jpg",
@@ -328,7 +354,6 @@ class AudibleMoAModule(BasePortalModule):
         with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
             for t in transfers:
                 try:
-                    # Für Cover: Remote-Ordner /{ean}/ anlegen falls nicht vorhanden
                     if t.file_type == "cover" and t.ean:
                         remote_folder = f"/{t.ean}"
                         try:
@@ -362,10 +387,66 @@ class AudibleMoAModule(BasePortalModule):
             logger.error(f"Audible MoA: Excel-Lesefehler: {e}")
             return []
 
+    def get_mail_draft(self) -> dict | None:
+        """
+        MoA-Mailvorlage (Meldung ohne Audio).
+        Entspricht der alten Desktop-App create_moa_email exakt.
+        """
+        if not self._metadata_path or not os.path.isfile(self._metadata_path):
+            return None
+        try:
+            df = pd.read_excel(self._metadata_path, dtype=str)
+            # Lowercase für robuste Spaltensuche (wie alte App)
+            df.columns = df.columns.str.strip().str.lower()
+
+            col_map = {
+                "Title":                        "title",
+                "Unique identifier (ISBN/EAN)": _AUDIBLE_ISBN_COL.lower(),
+                "Length (minutes)":             "length in minutes",
+                "Publication Date":             "audiobook pub date (mm/dd/yyyy)",
+            }
+            table_data = {}
+            for display, src in col_map.items():
+                table_data[display] = df[src].tolist() if src in df.columns else [""] * len(df)
+
+            html_table = _outlook_table(pd.DataFrame(table_data))
+
+            count = len(self._cover_eans)
+            if count == 1:
+                intro = (
+                    "Here's a new title for you.<br><br>"
+                    "The title is to be made available for preorder without audio assets."
+                )
+            else:
+                intro = (
+                    "Here are new titles for you.<br><br>"
+                    "These titles are to be made available for preorder without audio assets."
+                )
+
+            body = (
+                '<div style="font-family:Arial,sans-serif;font-size:13px;color:#000000;">'
+                "<p>Categories: Delivery</p>"
+                "<p>Dear Audible team,</p>"
+                f"<p>{intro}</p>"
+                f"{html_table}"
+                f"{_MAIL_END}"
+                "</div>"
+            )
+
+            return {
+                "to": "eu-delivery@audible.de; kurzke@audible.de",
+                "subject": "Der Audio Verlag - New Upload on FTP",
+                "body": body,
+                "is_html": True,
+            }
+        except Exception as e:
+            logger.error(f"Audible MoA: Mail-Entwurf konnte nicht erstellt werden: {e}")
+            return None
+
 
 @register_portal("audible_fulfill")
 class AudibleFulfillModule(AudibleModule):
-    """Audible Preorder Fulfill — wie Standard, aber eigener Config-Abschnitt."""
+    """Audible Preorder Fulfill — wie Standard, aber eigener Config-Abschnitt und eigene Mailvorlage."""
 
     def __init__(self, config, portal_name):
         BasePortalModule.__init__(self, config, portal_name)
@@ -379,3 +460,49 @@ class AudibleFulfillModule(AudibleModule):
         self.password = _decode_password(config, sec)
         self.remote_path = self._get(sec, "remote_path", "/")
         self._mail_draft_data: dict | None = None
+
+    def _build_mail_data(self, excel_path: str, eans: list[str]) -> dict | None:
+        """
+        Preorder-Fulfillment-Mailvorlage.
+        Entspricht der alten Desktop-App process_fulfill exakt.
+        """
+        try:
+            df_full = pd.read_excel(excel_path)
+
+            # Vollständigkeitsprüfung
+            warnings = []
+            for _, row in df_full.iterrows():
+                missing = [c for c in _REQUIRED_COLS if c in df_full.columns and pd.isnull(row.get(c))]
+                if missing:
+                    title = row.get("Title", row.get("title", "Unbekannt"))
+                    warnings.append(f'Metadaten von "{title}" unvollständig.')
+            unique_warnings = "<br>".join(set(warnings))
+
+            html_table = _build_audible_table(df_full)
+
+            warn_block = (
+                f"<p style='color:#cc0000;font-family:Arial,sans-serif;font-size:13px;'>{unique_warnings}</p>"
+                if unique_warnings.strip() else ""
+            )
+
+            body = (
+                '<div style="font-family:Arial,sans-serif;font-size:13px;color:#000000;">'
+                "<p>Categories: Preorder Fulfillment</p>"
+                "<p>Dear Audible team,</p>"
+                "<p>we have uploaded the audio assets for the title in preorder<br><br>"
+                "The exclusive titles are marked in green.</p>"
+                f"{warn_block}"
+                f"{html_table}"
+                f"{_MAIL_END}"
+                "</div>"
+            )
+
+            return {
+                "to": "eu-delivery@audible.de; kurzke@audible.de",
+                "subject": "Der Audio Verlag - Preorder Fulfillment",
+                "body": body,
+                "is_html": True,
+            }
+        except Exception as e:
+            logger.error(f"Audible Fulfill: Mail-Entwurf konnte nicht erstellt werden: {e}")
+            return None
