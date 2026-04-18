@@ -10,6 +10,7 @@ export interface DeliveryRun {
   skipped_files: number
   started_at: string
   finished_at: string | null
+  mail_draft?: MailDraft | null
 }
 
 export interface DeliveryLog {

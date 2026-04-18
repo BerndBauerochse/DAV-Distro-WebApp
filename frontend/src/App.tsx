@@ -1,12 +1,14 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { LayoutDashboard, History as HistoryIcon, FolderOpen, LogOut, Camera } from 'lucide-react'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
 import { FileManager } from './components/FileManager'
 import { LoginPage } from './components/LoginPage'
+import { MailDraftModal } from './components/MailDraftModal'
 import { useAuth, getStoredAuth } from './hooks/useAuth'
 import { UploadProvider } from './contexts/UploadContext'
+import type { MailDraft } from './types'
 
 const APP_VERSION = '1.3'
 
@@ -89,6 +91,11 @@ export function App() {
   const { auth, login, logout } = useAuth()
   const [page, setPage] = useState<Page>('dashboard')
   const { avatar, set: setAvatar } = useAvatar(auth.username)
+  const [mailDraft, setMailDraft] = useState<{ runId: string; draft: MailDraft; portalName: string } | null>(null)
+
+  const handleMailDraft = useCallback((runId: string, draft: MailDraft, portalName: string) => {
+    setMailDraft({ runId, draft, portalName })
+  }, [])
   const avatarRef = useRef<HTMLInputElement>(null)
 
   function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
@@ -110,6 +117,16 @@ export function App() {
           <div className="orb orb-2" />
           <div className="orb orb-3" />
           <div className="grain" />
+
+          {/* ── Mail Draft Modal — rendered at root level so it shows on any page ── */}
+          {mailDraft && (
+            <MailDraftModal
+              runId={mailDraft.runId}
+              draft={mailDraft.draft}
+              portalName={mailDraft.portalName}
+              onClose={() => setMailDraft(null)}
+            />
+          )}
 
           {/* ── Floating App Shell ─────────────────────── */}
           <div className="app-shell">
@@ -226,7 +243,7 @@ export function App() {
                 </div>
 
                 {/* Pages — all mounted, inactive hidden */}
-                <div className={page !== 'dashboard' ? 'hidden' : 'fade-up stagger-2'}><Dashboard /></div>
+                <div className={page !== 'dashboard' ? 'hidden' : 'fade-up stagger-2'}><Dashboard onMailDraft={handleMailDraft} /></div>
                 <div className={page !== 'history'   ? 'hidden' : 'fade-up stagger-2'}><History /></div>
                 <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager /></div>
               </div>

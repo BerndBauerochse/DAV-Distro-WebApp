@@ -190,6 +190,7 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             _update_run_counts(db_session_factory, run_id, total, 0, 0, 0), loop
         ).result()
 
+        # Blocking — frontend must know total_files BEFORE any progress events arrive
         asyncio.run_coroutine_threadsafe(
             ws_manager.broadcast({
                 "type": "run_update",
@@ -202,7 +203,7 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
                 "skipped_files": 0,
             }),
             loop,
-        )
+        ).result()
 
         # Track which files have been started by progress_cb (to detect unprocessed ones)
         processed_file_names: set[str] = set()
@@ -263,15 +264,6 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
                 }),
                 loop,
             )
-
-            if status in ("success", "failed", "skipped"):
-                asyncio.run_coroutine_threadsafe(
-                    _update_run_counts(
-                        db_session_factory, run_id,
-                        total, completed, failed, skipped
-                    ),
-                    loop,
-                )
 
         module.ship(str(run_id), transfers, progress_cb)
 

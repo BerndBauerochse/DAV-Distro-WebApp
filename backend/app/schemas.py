@@ -61,6 +61,7 @@ class DeliveryRunOut(BaseModel):
     skipped_files: int
     started_at: datetime
     finished_at: datetime | None
+    mail_draft: dict | None = None
 
     model_config = {"from_attributes": True}
 

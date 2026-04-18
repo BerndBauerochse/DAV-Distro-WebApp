@@ -3,16 +3,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity, Zap } from 'lucide-react'
 import { ActiveRunCard } from './ActiveRunCard'
 import { BatchBuilder } from './BatchBuilder'
-import { MailDraftModal } from './MailDraftModal'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { api } from '../api/client'
 import type { DeliveryRun, WsEvent, ActiveTransfer, MailDraft } from '../types'
 
-export function Dashboard() {
+interface Props {
+  onMailDraft: (runId: string, draft: MailDraft, portalName: string) => void
+}
+
+export function Dashboard({ onMailDraft }: Props) {
   const qc = useQueryClient()
   const [activeRuns, setActiveRuns] = useState<Map<string, DeliveryRun>>(new Map())
   const [transfers, setTransfers] = useState<Map<string, ActiveTransfer[]>>(new Map())
-  const [mailDraft, setMailDraft] = useState<{ runId: string; draft: MailDraft; portalName: string } | null>(null)
 
   const { data: initialRuns } = useQuery({
     queryKey: ['active-runs'],
@@ -53,7 +55,7 @@ export function Dashboard() {
         qc.invalidateQueries({ queryKey: ['runs'] })
         if (event.mail_draft) {
           const portalName = event.portal.charAt(0).toUpperCase() + event.portal.slice(1)
-          setMailDraft({ runId: event.run_id, draft: event.mail_draft, portalName })
+          onMailDraft(event.run_id, event.mail_draft, portalName)
         }
       }
     }
@@ -88,7 +90,7 @@ export function Dashboard() {
         return next
       })
     }
-  }, [qc])
+  }, [qc, onMailDraft])
 
   useWebSocket(handleWsEvent)
 
@@ -108,15 +110,6 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {mailDraft && (
-        <MailDraftModal
-          runId={mailDraft.runId}
-          draft={mailDraft.draft}
-          portalName={mailDraft.portalName}
-          onClose={() => setMailDraft(null)}
-        />
-      )}
-
       {/* Layout: two column on large screens */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
 
