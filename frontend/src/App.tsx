@@ -64,15 +64,15 @@ export function App() {
             {/* Sidebar */}
             <aside className="shell-sidebar">
 
-              {/* Logo */}
-              <div className="px-5 pt-6 pb-5">
-                <div className="flex items-center gap-3">
-                  <img src="/logo.png" alt="DAV" className="w-9 h-9 object-contain shrink-0" />
-                  <div>
-                    <p style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em' }}>Der Audio Verlag</p>
-                    <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)' }}>Audio Distribution</p>
-                  </div>
-                </div>
+              {/* Logo — vertical brand block */}
+              <div className="px-5 pt-7 pb-5">
+                <img src="/logo.png" alt="DAV" className="w-10 h-10 object-contain mb-3" />
+                <p style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)', letterSpacing: '-0.01em', lineHeight: 1.2 }}>
+                  Der Audio Verlag
+                </p>
+                <p style={{ fontSize: '0.6875rem', color: 'var(--text-400)', letterSpacing: '0.05em', marginTop: '0.2rem' }}>
+                  Digital Distribution
+                </p>
               </div>
 
               {/* Divider */}
@@ -88,10 +88,10 @@ export function App() {
                       onClick={() => setPage(item.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 fade-up stagger-${Math.min(i + 1, 4)}`}
                       style={active
-                        ? { background: 'linear-gradient(135deg,rgba(34,211,238,0.12),rgba(167,139,250,0.07))', border: '1px solid rgba(34,211,238,0.18)', color: '#22d3ee' }
+                        ? { background: '#6d28d9', border: '1px solid #7c3aed', color: '#ffffff' }
                         : { color: 'var(--text-300)', border: '1px solid transparent' }}
-                      onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--text-200)' }}
-                      onMouseLeave={e => { if (!active) e.currentTarget.style.color = 'var(--text-300)' }}
+                      onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(109,40,217,0.15)'; e.currentTarget.style.color = 'var(--text-100)' } }}
+                      onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-300)' } }}
                     >
                       {item.icon}
                       <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: active ? 600 : 500, fontSize: '0.875rem' }}>
@@ -99,7 +99,7 @@ export function App() {
                       </span>
                       {active && (
                         <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: 'var(--cyan)', boxShadow: '0 0 8px var(--cyan)' }} />
+                          style={{ background: 'rgba(255,255,255,0.7)' }} />
                       )}
                     </button>
                   )

@@ -347,11 +347,11 @@ export function FileManager() {
           <button key={cat.key} onClick={() => setActiveTab(cat.key)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150"
             style={activeTab === cat.key
-              ? { background: 'rgba(34,211,238,0.12)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }
+              ? { background: '#6d28d9', color: '#ffffff', border: '1px solid #7c3aed' }
               : { color: 'var(--text-muted)', border: '1px solid transparent' }
             }
-            onMouseEnter={e => { if (activeTab !== cat.key) (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)' }}
-            onMouseLeave={e => { if (activeTab !== cat.key) (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)' }}
+            onMouseEnter={e => { if (activeTab !== cat.key) { (e.currentTarget as HTMLElement).style.background = 'rgba(109,40,217,0.18)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-100)' } }}
+            onMouseLeave={e => { if (activeTab !== cat.key) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)' } }}
           >
             {cat.icon}
             {cat.label}

@@ -298,9 +298,9 @@
 
   /* Active nav item */
   .nav-item-active {
-    background: linear-gradient(135deg, rgba(34,211,238,0.12) 0%, rgba(167,139,250,0.08) 100%);
-    border: 1px solid rgba(34,211,238,0.18);
-    color: #22d3ee;
+    background: #6d28d9;
+    border: 1px solid #7c3aed;
+    color: #ffffff;
   }
   .nav-item-active .nav-dot { opacity: 1; }
 
