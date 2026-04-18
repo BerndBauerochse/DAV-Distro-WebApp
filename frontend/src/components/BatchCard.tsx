@@ -19,9 +19,8 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
 
 interface Props {
   preview: BatchPreview
-  onStart: (portal: string, file: File) => void
+  onStart: (portal: string) => void
   onRemove: () => void
-  file: File
   isStarting: boolean
 }
 
@@ -38,7 +37,7 @@ function AbridgedBadge({ abridged }: { abridged: boolean | null }) {
       </span>
 }
 
-export function BatchCard({ preview, onStart, onRemove, file, isStarting }: Props) {
+export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const hasVariants = preview.portal_variants.length > 1
   const [selectedPortal, setSelectedPortal] = useState(
     preview.portal_variants[0]?.key ?? preview.detected_portal
@@ -86,7 +85,7 @@ export function BatchCard({ preview, onStart, onRemove, file, isStarting }: Prop
             </span>
           )}
           <button
-            onClick={() => onStart(selectedPortal, file)}
+            onClick={() => onStart(selectedPortal)}
             disabled={isStarting || totalCount === 0}
             className="btn-accent flex items-center gap-1.5 py-1.5 px-3"
           >

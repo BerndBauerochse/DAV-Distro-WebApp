@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square } from 'lucide-react'
+import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square, Play } from 'lucide-react'
 import { api } from '../api/client'
 import { useUpload } from '../contexts/UploadContext'
 import { getStoredAuth } from '../hooks/useAuth'
@@ -68,7 +68,7 @@ function AuthImage({ filename, alt, className }: { filename: string; alt: string
   )
 }
 
-function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
+function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGORIES[number]; onUseForDelivery?: (filename: string) => void }) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -314,6 +314,16 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
                 </p>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {category.key === 'metadata' && onUseForDelivery && (
+                  <button
+                    onClick={() => onUseForDelivery(f.name)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg transition-colors"
+                    style={{ background: 'rgba(109,40,217,0.2)', color: '#a78bfa', border: '1px solid rgba(109,40,217,0.3)' }}
+                    title="Im Dashboard für Auslieferung verwenden">
+                    <Play className="w-3 h-3" />
+                    Verwenden
+                  </button>
+                )}
                 <a href={api.getFileDownloadUrl(category.key, f.name)} download={f.name}
                   onClick={e => e.stopPropagation()}
                   className="p-1.5 rounded-lg transition-colors"
@@ -355,7 +365,7 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
   )
 }
 
-export function FileManager() {
+export function FileManager({ onUseForDelivery }: { onUseForDelivery?: (filename: string) => void }) {
   const [activeTab, setActiveTab] = useState<FileCategory>('zips')
   const active = CATEGORIES.find(c => c.key === activeTab)!
 
@@ -382,7 +392,7 @@ export function FileManager() {
       {/* Panel */}
       <div className="glass-card p-6">
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{active.desc}</p>
-        <CategoryPanel category={active} />
+        <CategoryPanel category={active} onUseForDelivery={onUseForDelivery} />
       </div>
     </div>
   )

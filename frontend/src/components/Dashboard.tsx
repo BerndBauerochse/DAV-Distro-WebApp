@@ -1,17 +1,18 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Activity, Zap } from 'lucide-react'
 import { ActiveRunCard } from './ActiveRunCard'
-import { BatchBuilder } from './BatchBuilder'
+import { BatchBuilder, type BatchBuilderHandle } from './BatchBuilder'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { api } from '../api/client'
 import type { DeliveryRun, WsEvent, ActiveTransfer, MailDraft } from '../types'
 
 interface Props {
   onMailDraft: (runId: string, draft: MailDraft, portalName: string) => void
+  batchBuilderRef?: React.Ref<BatchBuilderHandle>
 }
 
-export function Dashboard({ onMailDraft }: Props) {
+export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
   const qc = useQueryClient()
   const [activeRuns, setActiveRuns] = useState<Map<string, DeliveryRun>>(new Map())
   const [transfers, setTransfers] = useState<Map<string, ActiveTransfer[]>>(new Map())
@@ -115,7 +116,7 @@ export function Dashboard({ onMailDraft }: Props) {
 
         {/* Left: Batch builder */}
         <div className="glass-card p-5">
-          <BatchBuilder onStarted={handleStarted} />
+          <BatchBuilder ref={batchBuilderRef} onStarted={handleStarted} />
         </div>
 
         {/* Right: Active runs */}

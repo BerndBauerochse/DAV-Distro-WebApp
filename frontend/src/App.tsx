@@ -9,6 +9,7 @@ import { MailDraftModal } from './components/MailDraftModal'
 import { useAuth, getStoredAuth } from './hooks/useAuth'
 import { UploadProvider } from './contexts/UploadContext'
 import type { MailDraft } from './types'
+import type { BatchBuilderHandle } from './components/BatchBuilder'
 
 const APP_VERSION = '1.4'
 
@@ -92,10 +93,17 @@ export function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const { avatar, set: setAvatar } = useAvatar(auth.username)
   const [mailDraft, setMailDraft] = useState<{ runId: string; draft: MailDraft; portalName: string } | null>(null)
+  const batchBuilderRef = useRef<BatchBuilderHandle>(null)
 
   const handleMailDraft = useCallback((runId: string, draft: MailDraft, portalName: string) => {
     setMailDraft({ runId, draft, portalName })
   }, [])
+
+  const handleUseForDelivery = useCallback((filename: string) => {
+    setPage('dashboard')
+    setTimeout(() => batchBuilderRef.current?.addServerFile(filename), 50)
+  }, [])
+
   const avatarRef = useRef<HTMLInputElement>(null)
 
   function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
@@ -243,9 +251,9 @@ export function App() {
                 </div>
 
                 {/* Pages — all mounted, inactive hidden */}
-                <div className={page !== 'dashboard' ? 'hidden' : 'fade-up stagger-2'}><Dashboard onMailDraft={handleMailDraft} /></div>
+                <div className={page !== 'dashboard' ? 'hidden' : 'fade-up stagger-2'}><Dashboard onMailDraft={handleMailDraft} batchBuilderRef={batchBuilderRef} /></div>
                 <div className={page !== 'history'   ? 'hidden' : 'fade-up stagger-2'}><History /></div>
-                <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager /></div>
+                <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager onUseForDelivery={handleUseForDelivery} /></div>
               </div>
             </main>
 

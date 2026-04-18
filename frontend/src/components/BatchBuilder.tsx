@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState, useCallback } from 'react'
 import { Upload, Loader2, Play } from 'lucide-react'
 import { BatchCard } from './BatchCard'
 import { api } from '../api/client'
@@ -6,17 +6,22 @@ import type { BatchPreview } from '../types'
 
 interface BatchEntry {
   id: string
-  file: File
+  file: File | null
+  serverFilename: string | null
   preview: BatchPreview | null
   loading: boolean
   error: string | null
+}
+
+export interface BatchBuilderHandle {
+  addServerFile: (filename: string) => void
 }
 
 interface Props {
   onStarted: (runId: string) => void
 }
 
-export function BatchBuilder({ onStarted }: Props) {
+export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function BatchBuilder({ onStarted }, ref) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
   const [batches, setBatches] = useState<BatchEntry[]>([])
@@ -27,6 +32,7 @@ export function BatchBuilder({ onStarted }: Props) {
     const newEntries: BatchEntry[] = fileArr.map(file => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
+      serverFilename: null,
       preview: null,
       loading: true,
       error: null,
@@ -35,7 +41,7 @@ export function BatchBuilder({ onStarted }: Props) {
     await Promise.all(
       newEntries.map(async entry => {
         try {
-          const preview = await api.previewMetadata(entry.file)
+          const preview = await api.previewMetadata(entry.file!)
           setBatches(prev => prev.map(b => b.id === entry.id ? { ...b, preview, loading: false } : b))
         } catch (err) {
           setBatches(prev => prev.map(b =>
@@ -45,6 +51,28 @@ export function BatchBuilder({ onStarted }: Props) {
       })
     )
   }, [])
+
+  const addServerFile = useCallback(async (filename: string) => {
+    const entry: BatchEntry = {
+      id: `${Date.now()}-${Math.random()}`,
+      file: null,
+      serverFilename: filename,
+      preview: null,
+      loading: true,
+      error: null,
+    }
+    setBatches(prev => [...prev, entry])
+    try {
+      const preview = await api.previewMetadataByName(filename)
+      setBatches(prev => prev.map(b => b.id === entry.id ? { ...b, preview, loading: false } : b))
+    } catch (err) {
+      setBatches(prev => prev.map(b =>
+        b.id === entry.id ? { ...b, loading: false, error: (err as Error).message } : b
+      ))
+    }
+  }, [])
+
+  useImperativeHandle(ref, () => ({ addServerFile }), [addServerFile])
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
@@ -56,10 +84,14 @@ export function BatchBuilder({ onStarted }: Props) {
     setBatches(prev => prev.filter(b => b.id !== id))
   }
 
-  async function handleStart(id: string, portal: string, file: File) {
+  async function handleStart(id: string, portal: string) {
+    const batch = batches.find(b => b.id === id)
+    if (!batch) return
     setStartingIds(prev => new Set(prev).add(id))
     try {
-      const { run_id } = await api.startRun(portal, file)
+      const { run_id } = batch.serverFilename
+        ? await api.startRunByServerFile(portal, batch.serverFilename)
+        : await api.startRun(portal, batch.file ?? undefined)
       onStarted(run_id)
       setBatches(prev => prev.filter(b => b.id !== id))
     } catch (err) {
@@ -74,7 +106,7 @@ export function BatchBuilder({ onStarted }: Props) {
     for (const batch of ready) {
       if (!batch.preview) continue
       const portal = batch.preview.portal_variants[0]?.key ?? batch.preview.detected_portal
-      await handleStart(batch.id, portal, batch.file)
+      await handleStart(batch.id, portal)
     }
   }
 
@@ -134,11 +166,12 @@ export function BatchBuilder({ onStarted }: Props) {
       {batches.length > 0 && (
         <div className="space-y-3">
           {batches.map(batch => {
+            const displayName = batch.file?.name ?? batch.serverFilename ?? '…'
             if (batch.loading) {
               return (
                 <div key={batch.id} className="glass-card px-5 py-4 flex items-center gap-3">
                   <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: '#22d3ee' }} />
-                  <span className="text-sm text-white/60 truncate">{batch.file.name}</span>
+                  <span className="text-sm text-white/60 truncate">{displayName}</span>
                   <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
                     wird analysiert…
                   </span>
@@ -150,7 +183,7 @@ export function BatchBuilder({ onStarted }: Props) {
                 <div key={batch.id} className="glass-card px-5 py-4 flex items-center justify-between gap-3"
                   style={{ borderColor: 'rgba(248,113,113,0.25)' }}>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-white/70 truncate">{batch.file.name}</p>
+                    <p className="text-sm font-medium text-white/70 truncate">{displayName}</p>
                     <p className="text-xs mt-0.5" style={{ color: '#f87171' }}>
                       {batch.error ?? 'Unbekannter Fehler'}
                     </p>
@@ -165,9 +198,8 @@ export function BatchBuilder({ onStarted }: Props) {
               <BatchCard
                 key={batch.id}
                 preview={batch.preview}
-                file={batch.file}
                 isStarting={startingIds.has(batch.id)}
-                onStart={(portal, file) => handleStart(batch.id, portal, file)}
+                onStart={portal => handleStart(batch.id, portal)}
                 onRemove={() => handleRemove(batch.id)}
               />
             )
@@ -176,4 +208,4 @@ export function BatchBuilder({ onStarted }: Props) {
       )}
     </div>
   )
-}
+})

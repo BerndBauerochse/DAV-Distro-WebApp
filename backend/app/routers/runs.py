@@ -121,7 +121,8 @@ async def get_run_logs(
 
 @router.post("/preview")
 async def preview_metadata(
-    metadata_file: UploadFile = File(...),
+    metadata_file: UploadFile | None = File(default=None),
+    metadata_server_file: str | None = Form(default=None),
     _user: str = Depends(get_current_user),
 ):
     """Parst eine Metadatei, erkennt das Portal und gibt Buchtitel + ZIP-Verfügbarkeit zurück."""
@@ -131,20 +132,36 @@ async def preview_metadata(
     storage_root = os.getenv("STORAGE_DIR", "/storage")
     source_dir = os.path.join(storage_root, "zips")
 
-    suffix = _Path(metadata_file.filename or "file").suffix or ".xml"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
-        f.write(await metadata_file.read())
-        temp_path = f.name
+    temp_path = None
+    filename = ""
+    cleanup = False
+
+    if metadata_server_file:
+        server_path = os.path.join(storage_root, "metadata", os.path.basename(metadata_server_file))
+        if not os.path.isfile(server_path):
+            raise HTTPException(status_code=404, detail="Server-Metadatei nicht gefunden")
+        temp_path = server_path
+        filename = os.path.basename(metadata_server_file)
+    elif metadata_file and metadata_file.filename:
+        suffix = _Path(metadata_file.filename).suffix or ".xml"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
+            f.write(await metadata_file.read())
+            temp_path = f.name
+        filename = metadata_file.filename
+        cleanup = True
+    else:
+        raise HTTPException(status_code=422, detail="Keine Metadatei angegeben")
 
     try:
-        result = parse_metadata(temp_path, metadata_file.filename or "", source_dir)
+        result = parse_metadata(temp_path, filename, source_dir)
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
     finally:
-        try:
-            os.unlink(temp_path)
-        except Exception:
-            pass
+        if cleanup and temp_path:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
 
     return {
         "filename": result.filename,
@@ -167,6 +184,7 @@ async def preview_metadata(
 async def check_run(
     portal: str = Form(...),
     metadata_file: UploadFile | None = File(default=None),
+    metadata_server_file: str | None = Form(default=None),
     _user: str = Depends(get_current_user),
 ):
     """Pre-flight check: returns EANs whose ZIP files are missing in source_dir."""
@@ -179,20 +197,28 @@ async def check_run(
 
     config = load_config()
     module = module_cls(config, portal)
+    storage_root = os.getenv("STORAGE_DIR", "/storage")
 
     temp_path = None
-    if metadata_file and metadata_file.filename:
+    cleanup = False
+
+    if metadata_server_file:
+        server_path = os.path.join(storage_root, "metadata", os.path.basename(metadata_server_file))
+        if os.path.isfile(server_path):
+            temp_path = server_path
+    elif metadata_file and metadata_file.filename:
         suffix = _Path(metadata_file.filename).suffix or ".xml"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
             f.write(await metadata_file.read())
             temp_path = f.name
+        cleanup = True
 
     try:
         missing = module.check_missing(temp_path)
     except Exception:
         missing = []
     finally:
-        if temp_path:
+        if cleanup and temp_path:
             try:
                 os.unlink(temp_path)
             except Exception:
@@ -205,15 +231,22 @@ async def check_run(
 async def start_run(
     portal: str = Form(...),
     metadata_file: UploadFile | None = File(default=None),
+    metadata_server_file: str | None = Form(default=None),
     current_user: str = Depends(get_current_user),
 ):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
+    storage_root = os.getenv("STORAGE_DIR", "/storage")
     metadata_path = None
     metadata_filename = None
 
-    if metadata_file:
+    if metadata_server_file:
+        server_path = os.path.join(storage_root, "metadata", os.path.basename(metadata_server_file))
+        if not os.path.isfile(server_path):
+            raise HTTPException(status_code=404, detail="Server-Metadatei nicht gefunden")
+        metadata_filename = os.path.basename(metadata_server_file)
+        metadata_path = server_path
+    elif metadata_file and metadata_file.filename:
         metadata_filename = metadata_file.filename
-        # Store in a UUID subdirectory so os.path.basename() returns the original filename
         upload_subdir = os.path.join(UPLOAD_DIR, str(uuid.uuid4()))
         os.makedirs(upload_subdir, exist_ok=True)
         dest = os.path.join(upload_subdir, metadata_filename)

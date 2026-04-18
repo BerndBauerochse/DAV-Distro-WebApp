@@ -64,6 +64,12 @@ export const api = {
     return request('/runs/preview', { method: 'POST', body: form })
   },
 
+  async previewMetadataByName(serverFilename: string): Promise<BatchPreview> {
+    const form = new FormData()
+    form.append('metadata_server_file', serverFilename)
+    return request('/runs/preview', { method: 'POST', body: form })
+  },
+
   async checkRun(portal: string, file?: File): Promise<{ missing: string[] }> {
     const form = new FormData()
     form.append('portal', portal)
@@ -75,6 +81,13 @@ export const api = {
     const form = new FormData()
     form.append('portal', portal)
     if (file) form.append('metadata_file', file)
+    return request('/runs', { method: 'POST', body: form })
+  },
+
+  async startRunByServerFile(portal: string, serverFilename: string): Promise<{ run_id: string }> {
+    const form = new FormData()
+    form.append('portal', portal)
+    form.append('metadata_server_file', serverFilename)
     return request('/runs', { method: 'POST', body: form })
   },
 
