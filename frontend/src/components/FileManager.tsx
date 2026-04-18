@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Loader2, AlertCircle, CheckSquare, Square } from 'lucide-react'
+import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square } from 'lucide-react'
 import { api } from '../api/client'
 import { useUpload } from '../contexts/UploadContext'
 import { getStoredAuth } from '../hooks/useAuth'
 import type { FileCategory, FileEntry } from '../types'
 
 const CATEGORIES: { key: FileCategory; label: string; icon: React.ReactNode; accept: string; desc: string }[] = [
-  { key: 'zips',   label: 'ZIPs',  icon: <FileArchive className="w-4 h-4" />, accept: '.zip',             desc: 'Audiobook-Master-ZIPs' },
-  { key: 'toc',    label: 'TOC',   icon: <FileText    className="w-4 h-4" />, accept: '.xlsx,.xls,.csv',  desc: 'Table of Contents (Excel)' },
-  { key: 'pdf',    label: 'PDFs',  icon: <File        className="w-4 h-4" />, accept: '.pdf',             desc: 'Booklets & Beilagen' },
-  { key: 'covers', label: 'Cover', icon: <Image       className="w-4 h-4" />, accept: '.jpg,.jpeg,.png',  desc: 'Cover-Bilder (Audible MoA & andere)' },
+  { key: 'zips',     label: 'ZIPs',      icon: <FileArchive className="w-4 h-4" />, accept: '.zip',             desc: 'Audiobook-Master-ZIPs' },
+  { key: 'toc',      label: 'TOC',       icon: <FileText    className="w-4 h-4" />, accept: '.xlsx,.xls,.csv',  desc: 'Table of Contents (Excel)' },
+  { key: 'pdf',      label: 'PDFs',      icon: <File        className="w-4 h-4" />, accept: '.pdf',             desc: 'Booklets & Beilagen' },
+  { key: 'covers',   label: 'Cover',     icon: <Image       className="w-4 h-4" />, accept: '.jpg,.jpeg,.png',  desc: 'Cover-Bilder (Audible MoA & andere)' },
+  { key: 'metadata', label: 'Metadaten', icon: <Database    className="w-4 h-4" />, accept: '.xml,.xlsx',       desc: 'Metadaten-Dateien (XML, Excel)' },
 ]
+
+function extractEan(filename: string): string | null {
+  const m = filename.match(/(\d{13})/)
+  return m ? m[1] : null
+}
 
 function fmtBytes(b: number) {
   if (b < 1024) return `${b} B`
@@ -74,6 +80,13 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
     queryKey: ['files', category.key],
     queryFn: () => api.listFiles(category.key),
   })
+
+  const { data: covers = [] } = useQuery({
+    queryKey: ['files', 'covers'],
+    queryFn: () => api.listFiles('covers'),
+    enabled: category.key !== 'covers',
+  })
+  const coverEans = new Set((covers as FileEntry[]).map((c: FileEntry) => extractEan(c.name)).filter(Boolean))
 
   const deleteMutation = useMutation({
     mutationFn: (fn: string) => api.deleteFile(category.key, fn),
@@ -274,7 +287,11 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
             </button>
             <span className="section-label">Alle auswählen</span>
           </div>
-          {files.map((f: FileEntry) => (
+          {files.map((f: FileEntry) => {
+            const ean = extractEan(f.name)
+            const hasCover = ean !== null && coverEans.has(ean)
+            const coverFilename = hasCover ? `${ean}.jpg` : null
+            return (
             <div key={f.name}
               className="flex items-center gap-3 px-4 py-2.5 glass-row group"
               style={{
@@ -286,7 +303,10 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
                 style={{ color: selected.has(f.name) ? '#22d3ee' : 'var(--text-muted)' }}>
                 {selected.has(f.name) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
               </button>
-              <div className="shrink-0" style={{ color: 'var(--text-muted)' }}>{category.icon}</div>
+              {coverFilename
+                ? <AuthImage filename={coverFilename} alt={f.name} className="shrink-0 w-10 h-10 rounded-lg overflow-hidden" />
+                : <div className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)' }}>{category.icon}</div>
+              }
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white/80 truncate">{f.name}</p>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -328,7 +348,7 @@ function CategoryPanel({ category }: { category: typeof CATEGORIES[number] }) {
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>

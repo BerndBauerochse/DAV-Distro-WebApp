@@ -20,10 +20,11 @@ THUMB_SIZE  = 200
 STORAGE_ROOT = Path(os.getenv("STORAGE_DIR", "/storage"))
 
 CATEGORIES = {
-    "zips":   STORAGE_ROOT / "zips",
-    "toc":    STORAGE_ROOT / "toc",
-    "pdf":    STORAGE_ROOT / "pdf",
-    "covers": STORAGE_ROOT / "covers",
+    "zips":     STORAGE_ROOT / "zips",
+    "toc":      STORAGE_ROOT / "toc",
+    "pdf":      STORAGE_ROOT / "pdf",
+    "covers":   STORAGE_ROOT / "covers",
+    "metadata": STORAGE_ROOT / "metadata",
 }
 
 router = APIRouter(prefix="/files", tags=["files"])
@@ -42,7 +43,7 @@ class FileEntry(BaseModel):
 
 def _category_path(category: str) -> Path:
     if category not in CATEGORIES:
-        raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Use: zips, toc, pdf, covers")
+        raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Use: zips, toc, pdf, covers, metadata")
     _ensure_dirs()
     return CATEGORIES[category]
 
