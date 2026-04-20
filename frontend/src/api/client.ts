@@ -77,17 +77,19 @@ export const api = {
     return request('/runs/check', { method: 'POST', body: form })
   },
 
-  async startRun(portal: string, file?: File): Promise<{ run_id: string }> {
+  async startRun(portal: string, file?: File, takedown = false): Promise<{ run_id: string }> {
     const form = new FormData()
     form.append('portal', portal)
     if (file) form.append('metadata_file', file)
+    if (takedown) form.append('takedown', 'true')
     return request('/runs', { method: 'POST', body: form })
   },
 
-  async startRunByServerFile(portal: string, serverFilename: string): Promise<{ run_id: string }> {
+  async startRunByServerFile(portal: string, serverFilename: string, takedown = false): Promise<{ run_id: string }> {
     const form = new FormData()
     form.append('portal', portal)
     form.append('metadata_server_file', serverFilename)
+    if (takedown) form.append('takedown', 'true')
     return request('/runs', { method: 'POST', body: form })
   },
 

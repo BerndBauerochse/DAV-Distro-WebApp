@@ -34,6 +34,9 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
       const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
       const boundary = `----=_Part_${Date.now()}`
       const bodyType = draft.is_html ? 'text/html' : 'text/plain'
+      // Base64-encode body so umlauts and special chars survive MIME encoding
+      const bodyBytes = new TextEncoder().encode(draft.body)
+      const bodyB64 = btoa(String.fromCharCode(...bodyBytes)).match(/.{1,76}/g)!.join('\r\n')
 
       eml = [
         'MIME-Version: 1.0',
@@ -44,9 +47,9 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
         '',
         `--${boundary}`,
         `Content-Type: ${bodyType}; charset=utf-8`,
-        'Content-Transfer-Encoding: quoted-printable',
+        'Content-Transfer-Encoding: base64',
         '',
-        draft.body,
+        bodyB64,
         '',
         `--${boundary}`,
         'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

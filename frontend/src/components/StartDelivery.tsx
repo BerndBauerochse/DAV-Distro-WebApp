@@ -29,6 +29,7 @@ function detectPortal(filename: string): string | null {
 export function StartDelivery({ portals, onStarted }: Props) {
   const [portal, setPortal] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const [takedown, setTakedown] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [missingEans, setMissingEans] = useState<string[]>([])
@@ -38,10 +39,11 @@ export function StartDelivery({ portals, onStarted }: Props) {
     setLoading(true)
     setError(null)
     try {
-      const result = await api.startRun(portal, file ?? undefined)
+      const result = await api.startRun(portal, file ?? undefined, takedown)
       onStarted(result.run_id)
       setPortal('')
       setFile(null)
+      setTakedown(false)
       setMissingEans([])
       if (fileRef.current) fileRef.current.value = ''
     } catch (err) {
@@ -136,6 +138,26 @@ export function StartDelivery({ portals, onStarted }: Props) {
           />
         </div>
 
+        {/* Takedown toggle */}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => setTakedown(v => !v)}
+            className={clsx(
+              'relative w-10 h-6 rounded-full transition-colors flex-shrink-0',
+              takedown ? 'bg-orange-500' : 'bg-gray-200'
+            )}
+          >
+            <span className={clsx(
+              'absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform',
+              takedown ? 'translate-x-5' : 'translate-x-1'
+            )} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-700">Takedown</p>
+            <p className="text-xs text-gray-400">Nur Metadaten übertragen, keine Audio-/Cover-Dateien</p>
+          </div>
+        </label>
+
         {error && (
           <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
         )}
@@ -158,7 +180,7 @@ export function StartDelivery({ portals, onStarted }: Props) {
           ) : (
             <>
               <Play className="w-4 h-4" />
-              Auslieferung starten
+              {takedown ? 'Takedown starten' : 'Auslieferung starten'}
             </>
           )}
         </button>

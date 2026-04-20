@@ -78,6 +78,7 @@ async def start_delivery_run(
     metadata_filename: str | None,
     metadata_path: str | None,
     initiated_by: str | None = None,
+    takedown: bool = False,
 ) -> uuid.UUID:
     """
     Creates a DeliveryRun record and starts the delivery in a background thread.
@@ -119,12 +120,13 @@ async def start_delivery_run(
         portal_key,
         metadata_path,
         initiated_by,
+        takedown,
     )
 
     return run_id
 
 
-def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_path, initiated_by=None):
+def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_path, initiated_by=None, takedown=False):
     """Blocking delivery execution — runs in thread pool."""
     # Cache metadata path so the download endpoint can serve it
     if metadata_path:
@@ -158,6 +160,8 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
     try:
         transfers = module.get_files(str(run_id), metadata_path)
+        if takedown:
+            transfers = [t for t in transfers if t.file_type == "metadata"]
         total = len(transfers)
 
         if total == 0:
