@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { LayoutDashboard, History as HistoryIcon, FolderOpen, LogOut, Camera, FileArchive, FileText, File, Image, Database } from 'lucide-react'
+import { LayoutDashboard, History as HistoryIcon, FolderOpen, LogOut, Camera, FileArchive, FileText, File as FileIcon, Image as ImageIcon, Database } from 'lucide-react'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
 import { FileManager } from './components/FileManager'
@@ -28,8 +28,8 @@ const NAV = [
 const FILE_TABS: { key: FileCategory; label: string; icon: React.ReactNode }[] = [
   { key: 'zips',     label: 'ZIPs',      icon: <FileArchive className="w-3.5 h-3.5" /> },
   { key: 'toc',      label: 'TOC',       icon: <FileText    className="w-3.5 h-3.5" /> },
-  { key: 'pdf',      label: 'PDFs',      icon: <File        className="w-3.5 h-3.5" /> },
-  { key: 'covers',   label: 'Cover',     icon: <Image       className="w-3.5 h-3.5" /> },
+  { key: 'pdf',      label: 'PDFs',      icon: <FileIcon    className="w-3.5 h-3.5" /> },
+  { key: 'covers',   label: 'Cover',     icon: <ImageIcon   className="w-3.5 h-3.5" /> },
   { key: 'metadata', label: 'Metadaten', icon: <Database    className="w-3.5 h-3.5" /> },
 ]
 
