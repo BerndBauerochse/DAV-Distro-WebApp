@@ -386,8 +386,12 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
   )
 }
 
-export function FileManager({ onUseForDelivery }: { onUseForDelivery?: (filename: string) => void }) {
-  const [activeTab, setActiveTab] = useState<FileCategory>('zips')
+export function FileManager({ onUseForDelivery, activeTab = 'zips', onTabChange }: {
+  onUseForDelivery?: (filename: string) => void
+  activeTab?: FileCategory
+  onTabChange?: (tab: FileCategory) => void
+}) {
+  const setActiveTab = (tab: FileCategory) => onTabChange ? onTabChange(tab) : undefined
   const active = CATEGORIES.find(c => c.key === activeTab)!
 
   return (

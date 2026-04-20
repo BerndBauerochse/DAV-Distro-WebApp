@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { LayoutDashboard, History as HistoryIcon, FolderOpen, LogOut, Camera } from 'lucide-react'
+import { LayoutDashboard, History as HistoryIcon, FolderOpen, LogOut, Camera, FileArchive, FileText, File, Image, Database } from 'lucide-react'
 import { Dashboard } from './components/Dashboard'
 import { History } from './components/History'
 import { FileManager } from './components/FileManager'
@@ -8,7 +8,7 @@ import { LoginPage } from './components/LoginPage'
 import { MailDraftModal } from './components/MailDraftModal'
 import { useAuth, getStoredAuth } from './hooks/useAuth'
 import { UploadProvider } from './contexts/UploadContext'
-import type { MailDraft } from './types'
+import type { MailDraft, FileCategory } from './types'
 import type { BatchBuilderHandle } from './components/BatchBuilder'
 
 const APP_VERSION = '1.4'
@@ -20,9 +20,17 @@ const queryClient = new QueryClient({
 type Page = 'dashboard' | 'history' | 'files'
 
 const NAV = [
-  { id: 'dashboard' as Page, label: 'Dashboard', sub: 'Übersicht & Auslieferung', icon: <LayoutDashboard className="w-[17px] h-[17px]" /> },
-  { id: 'history'   as Page, label: 'Historie',  sub: 'Verlauf & Protokolle',   icon: <HistoryIcon     className="w-[17px] h-[17px]" /> },
-  { id: 'files'     as Page, label: 'Dateien',   sub: 'Server-Dateiverwaltung', icon: <FolderOpen      className="w-[17px] h-[17px]" /> },
+  { id: 'dashboard' as Page, label: 'Dashboard', icon: <LayoutDashboard className="w-[17px] h-[17px]" /> },
+  { id: 'history'   as Page, label: 'Historie',  icon: <HistoryIcon     className="w-[17px] h-[17px]" /> },
+  { id: 'files'     as Page, label: 'Dateien',   icon: <FolderOpen      className="w-[17px] h-[17px]" /> },
+]
+
+const FILE_TABS: { key: FileCategory; label: string; icon: React.ReactNode }[] = [
+  { key: 'zips',     label: 'ZIPs',      icon: <FileArchive className="w-3.5 h-3.5" /> },
+  { key: 'toc',      label: 'TOC',       icon: <FileText    className="w-3.5 h-3.5" /> },
+  { key: 'pdf',      label: 'PDFs',      icon: <File        className="w-3.5 h-3.5" /> },
+  { key: 'covers',   label: 'Cover',     icon: <Image       className="w-3.5 h-3.5" /> },
+  { key: 'metadata', label: 'Metadaten', icon: <Database    className="w-3.5 h-3.5" /> },
 ]
 
 const PAGE_TITLES: Record<Page, { title: string; sub: string }> = {
@@ -91,6 +99,7 @@ function useAvatar(username: string | null) {
 export function App() {
   const { auth, login, logout } = useAuth()
   const [page, setPage] = useState<Page>('dashboard')
+  const [fileTab, setFileTab] = useState<FileCategory>('zips')
   const { avatar, set: setAvatar } = useAvatar(auth.username)
   const [mailDraft, setMailDraft] = useState<{ runId: string; draft: MailDraft; portalName: string } | null>(null)
   const batchBuilderRef = useRef<BatchBuilderHandle>(null)
@@ -161,25 +170,51 @@ export function App() {
                 {NAV.map((item, i) => {
                   const active = page === item.id
                   return (
-                    <button
-                      key={item.id}
-                      onClick={() => setPage(item.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 fade-up stagger-${Math.min(i + 1, 4)}`}
-                      style={active
-                        ? { background: '#6d28d9', border: '1px solid #7c3aed', color: '#ffffff' }
-                        : { color: 'var(--text-300)', border: '1px solid transparent' }}
-                      onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(109,40,217,0.15)'; e.currentTarget.style.color = 'var(--text-100)' } }}
-                      onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-300)' } }}
-                    >
-                      {item.icon}
-                      <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: active ? 600 : 500, fontSize: '0.875rem' }}>
-                        {item.label}
-                      </span>
-                      {active && (
-                        <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: 'rgba(255,255,255,0.7)' }} />
+                    <div key={item.id}>
+                      <button
+                        onClick={() => setPage(item.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-150 fade-up stagger-${Math.min(i + 1, 4)}`}
+                        style={active
+                          ? { background: '#6d28d9', border: '1px solid #7c3aed', color: '#ffffff' }
+                          : { color: 'var(--text-300)', border: '1px solid transparent' }}
+                        onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'rgba(109,40,217,0.15)'; e.currentTarget.style.color = 'var(--text-100)' } }}
+                        onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-300)' } }}
+                      >
+                        {item.icon}
+                        <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: active ? 600 : 500, fontSize: '0.875rem' }}>
+                          {item.label}
+                        </span>
+                        {active && (
+                          <span className="ml-auto w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: 'rgba(255,255,255,0.7)' }} />
+                        )}
+                      </button>
+
+                      {/* File sub-tabs — always visible under Dateien */}
+                      {item.id === 'files' && (
+                        <div className="ml-3 mt-0.5 space-y-0.5 pl-3"
+                          style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                          {FILE_TABS.map(tab => {
+                            const tabActive = page === 'files' && fileTab === tab.key
+                            return (
+                              <button
+                                key={tab.key}
+                                onClick={() => { setPage('files'); setFileTab(tab.key) }}
+                                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-all duration-150"
+                                style={tabActive
+                                  ? { background: 'rgba(109,40,217,0.35)', color: '#c4b5fd', border: '1px solid rgba(124,58,237,0.4)' }
+                                  : { color: 'var(--text-400)', border: '1px solid transparent' }}
+                                onMouseEnter={e => { if (!tabActive) { e.currentTarget.style.background = 'rgba(109,40,217,0.12)'; e.currentTarget.style.color = 'var(--text-200)' } }}
+                                onMouseLeave={e => { if (!tabActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-400)' } }}
+                              >
+                                {tab.icon}
+                                <span style={{ fontSize: '0.8125rem', fontWeight: tabActive ? 600 : 400 }}>{tab.label}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
                       )}
-                    </button>
+                    </div>
                   )
                 })}
               </nav>
@@ -253,7 +288,7 @@ export function App() {
                 {/* Pages — all mounted, inactive hidden */}
                 <div className={page !== 'dashboard' ? 'hidden' : 'fade-up stagger-2'}><Dashboard onMailDraft={handleMailDraft} batchBuilderRef={batchBuilderRef} /></div>
                 <div className={page !== 'history'   ? 'hidden' : 'fade-up stagger-2'}><History /></div>
-                <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager onUseForDelivery={handleUseForDelivery} /></div>
+                <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager onUseForDelivery={handleUseForDelivery} activeTab={fileTab} onTabChange={setFileTab} /></div>
               </div>
             </main>
 
