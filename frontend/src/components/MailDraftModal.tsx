@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Mail, X, Download, Loader2 } from 'lucide-react'
+import { Mail, X, Paperclip, Copy, Check, ExternalLink } from 'lucide-react'
 import { getStoredAuth } from '../hooks/useAuth'
 import type { MailDraft } from '../types'
 
@@ -11,36 +11,59 @@ interface Props {
 }
 
 export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [attachmentError, setAttachmentError] = useState('')
 
-  async function openEml() {
-    setLoading(true)
-    setError('')
+  function buildMailtoLink() {
+    const to = encodeURIComponent(draft.to)
+    const subject = encodeURIComponent(draft.subject)
+    // For HTML mails use plain text body (HTML tags not supported in mailto)
+    const plainBody = draft.is_html
+      ? draft.body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s{2,}/g, ' ').trim()
+      : draft.body
+    const body = encodeURIComponent(plainBody)
+    return `mailto:${to}?subject=${subject}&body=${body}`
+  }
+
+  async function copyBody() {
+    try {
+      if (draft.is_html) {
+        await navigator.clipboard.writeText(draft.body)
+      } else {
+        await navigator.clipboard.writeText(draft.body)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  async function downloadAttachment() {
+    if (!draft.attachment) return
+    setAttachmentError('')
     try {
       const { token } = getStoredAuth()
-      const res = await fetch(`/api/runs/${runId}/mail.eml`, {
+      const res = await fetch(draft.attachment.download_url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const blob = await res.blob()
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href     = url
-      a.download = `audible-${runId}.eml`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = draft.attachment.filename
       a.click()
       URL.revokeObjectURL(url)
     } catch {
-      setError('EML-Datei konnte nicht geladen werden.')
-    } finally {
-      setLoading(false)
+      setAttachmentError('Anhang konnte nicht geladen werden.')
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}>
-      <div className="glass-card w-full max-w-md overflow-hidden fade-up">
+      <div className="glass-card w-full max-w-lg overflow-hidden fade-up">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4"
@@ -67,29 +90,57 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
           </button>
         </div>
 
-        {/* Info */}
-        <div className="px-6 py-5 space-y-4">
-          <div className="rounded-xl p-4 space-y-1.5"
+        {/* Mail info */}
+        <div className="px-6 py-5 space-y-3">
+          <div className="rounded-xl p-3 space-y-1"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>An</p>
             <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.to}</p>
           </div>
-          <div className="rounded-xl p-4 space-y-1.5"
+          <div className="rounded-xl p-3 space-y-1"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>Betreff</p>
             <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.subject}</p>
           </div>
 
-          <div className="rounded-xl p-4"
-            style={{ background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.2)' }}>
-            <p className="text-sm" style={{ color: 'var(--text-200)' }}>
-              Die E-Mail wird als <strong style={{ color: 'var(--text-100)' }}>.eml-Datei</strong> heruntergeladen
-              — einfach doppelklicken und direkt in Outlook senden. Tabelle und Formatierung sind korrekt.
-            </p>
+          {/* Body preview */}
+          <div className="rounded-xl p-3 space-y-1"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-300)' }}>Inhalt</p>
+            {draft.is_html ? (
+              <div className="text-sm max-h-32 overflow-y-auto"
+                style={{ color: 'var(--text-200)' }}
+                dangerouslySetInnerHTML={{ __html: draft.body }} />
+            ) : (
+              <pre className="text-sm whitespace-pre-wrap max-h-32 overflow-y-auto"
+                style={{ color: 'var(--text-200)', fontFamily: 'inherit' }}>
+                {draft.body}
+              </pre>
+            )}
           </div>
 
-          {error && (
-            <p className="text-sm" style={{ color: '#f87171' }}>{error}</p>
+          {/* Attachment hint */}
+          {draft.attachment && (
+            <div className="rounded-xl p-3 flex items-center justify-between gap-3"
+              style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.25)' }}>
+              <div className="flex items-center gap-2">
+                <Paperclip className="w-4 h-4 flex-shrink-0" style={{ color: '#fbbf24' }} />
+                <div>
+                  <p className="text-xs font-medium" style={{ color: '#fbbf24' }}>Anhang</p>
+                  <p className="text-xs" style={{ color: 'var(--text-300)' }}>{draft.attachment.filename}</p>
+                </div>
+              </div>
+              <button onClick={downloadAttachment}
+                className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex-shrink-0"
+                style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(251,191,36,0.25)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(251,191,36,0.15)')}>
+                Herunterladen
+              </button>
+            </div>
+          )}
+          {attachmentError && (
+            <p className="text-xs" style={{ color: '#f87171' }}>{attachmentError}</p>
           )}
         </div>
 
@@ -99,13 +150,20 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
           <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
             Schließen
           </button>
-          <button onClick={openEml} disabled={loading} className="btn-accent flex items-center gap-2 px-5 py-2">
-            {loading
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <Download className="w-4 h-4" />
-            }
-            {loading ? 'Lädt…' : 'Als .eml öffnen'}
+          <button onClick={copyBody}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors"
+            style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-200)', border: '1px solid var(--glass-border)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+            {copied ? <Check className="w-4 h-4" style={{ color: '#4ade80' }} /> : <Copy className="w-4 h-4" />}
+            {copied ? 'Kopiert!' : 'Text kopieren'}
           </button>
+          <a href={buildMailtoLink()}
+            className="btn-accent flex items-center gap-2 px-5 py-2 text-sm"
+            style={{ textDecoration: 'none' }}>
+            <ExternalLink className="w-4 h-4" />
+            In Outlook öffnen
+          </a>
         </div>
       </div>
     </div>

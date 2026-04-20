@@ -61,7 +61,7 @@ class BasePortalModule(ABC):
         Override in modules that ship ZIP files."""
         return []
 
-    def get_mail_draft(self) -> dict | None:
+    def get_mail_draft(self, user: str | None = None) -> dict | None:
         """Return mail draft data after a completed run, or None if no mail needed.
         Override in modules that generate notification emails.
         Returns dict with keys: to, subject, body"""

@@ -192,30 +192,31 @@ class ZebraModule(BasePortalModule):
         except Exception:
             return []
 
-    def get_mail_draft(self) -> dict | None:
+    def get_mail_draft(self, user: str | None = None) -> dict | None:
         heute = datetime.now().strftime("%Y-%m-%d")
+        name = user.capitalize() if user else "Bernd"
         count = self._extracted_count
         if count == 1:
             body = (
                 "Hallo Andreas,\n\n"
-                "Ich habe dir noch einen neuen Titel auf den Server geladen.\n\n"
-                "Liebe Grüße\nBernd"
+                f"Ich habe dir noch einen neuen Titel auf den Server geladen.\n\n"
+                f"Liebe Grüße\n{name}"
             )
         elif count > 1:
             body = (
                 "Hallo Andreas,\n\n"
-                "Ich habe dir noch ein paar neue Titel auf den Server geladen.\n\n"
-                "Liebe Grüße\nBernd"
+                f"Ich habe dir noch ein paar neue Titel auf den Server geladen.\n\n"
+                f"Liebe Grüße\n{name}"
             )
         else:
             body = (
                 "Hallo Andreas,\n\n"
-                "Es wurden keine neuen Titel auf den Server geladen.\n\n"
-                "Liebe Grüße\nBernd"
+                f"Es wurden keine neuen Titel auf den Server geladen.\n\n"
+                f"Liebe Grüße\n{name}"
             )
         return {
             "to": "content-operations-audiobook@zebralution.com; mara.hartung@zebralution.com",
             "subject": f"DAV {heute}",
             "body": body,
-            "has_attachment": True,  # delivery_service will inject attachment download URL
+            "has_attachment": True,
         }

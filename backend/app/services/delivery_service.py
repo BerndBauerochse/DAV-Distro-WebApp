@@ -118,12 +118,13 @@ async def start_delivery_run(
         run_id,
         portal_key,
         metadata_path,
+        initiated_by,
     )
 
     return run_id
 
 
-def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_path):
+def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_path, initiated_by=None):
     """Blocking delivery execution — runs in thread pool."""
     # Cache metadata path so the download endpoint can serve it
     if metadata_path:
@@ -346,7 +347,7 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
     mail_draft = None
     if final_status == "completed":
         try:
-            mail_draft = module.get_mail_draft()
+            mail_draft = module.get_mail_draft(user=initiated_by)
         except Exception:
             pass
 

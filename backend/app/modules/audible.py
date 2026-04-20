@@ -38,7 +38,7 @@ _REQUIRED_COLS = [
 _MAIL_END = (
     "<p>Please send me a confirmation that you are processing the data and, "
     "if errors occur, an error message immediately.</p>"
-    "<p>Thank you.<br>Bernd</p>"
+    "<p>Thank you.<br>__USER__</p>"
 )
 
 
@@ -205,8 +205,13 @@ class AudibleModule(BasePortalModule):
             return []
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
-    def get_mail_draft(self) -> dict | None:
-        return self._mail_draft_data
+    def get_mail_draft(self, user: str | None = None) -> dict | None:
+        if not self._mail_draft_data:
+            return None
+        name = user.capitalize() if user else "Bernd"
+        draft = dict(self._mail_draft_data)
+        draft["body"] = draft.get("body", "").replace("__USER__", name)
+        return draft
 
     # ------------------------------------------------------------------ helpers
 
@@ -387,7 +392,7 @@ class AudibleMoAModule(BasePortalModule):
             logger.error(f"Audible MoA: Excel-Lesefehler: {e}")
             return []
 
-    def get_mail_draft(self) -> dict | None:
+    def get_mail_draft(self, user: str | None = None) -> dict | None:
         """
         MoA-Mailvorlage (Meldung ohne Audio).
         Entspricht der alten Desktop-App create_moa_email exakt.
@@ -433,10 +438,11 @@ class AudibleMoAModule(BasePortalModule):
                 "</div>"
             )
 
+            name = user.capitalize() if user else "Bernd"
             return {
                 "to": "eu-delivery@audible.de; kurzke@audible.de",
                 "subject": "Der Audio Verlag - New Upload on FTP",
-                "body": body,
+                "body": body.replace("__USER__", name),
                 "is_html": True,
             }
         except Exception as e:
