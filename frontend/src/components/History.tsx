@@ -30,7 +30,18 @@ export function History() {
 
   const deleteMutation = useMutation({
     mutationFn: (runId: string) => api.deleteRun(runId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs'] }),
+    onMutate: async (runId) => {
+      await qc.cancelQueries({ queryKey: ['runs'] })
+      const previous = qc.getQueryData(['runs', portalFilter, limit])
+      qc.setQueryData(['runs', portalFilter, limit], (old: DeliveryRun[] = []) =>
+        old.filter(r => r.id !== runId)
+      )
+      return { previous }
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['runs', portalFilter, limit], ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['runs'] }),
   })
 
   const cancelMutation = useMutation({

@@ -90,12 +90,33 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
 
   const deleteMutation = useMutation({
     mutationFn: (fn: string) => api.deleteFile(category.key, fn),
-    onSuccess: () => { setDeletingFile(null); qc.invalidateQueries({ queryKey: ['files', category.key] }) },
+    onMutate: async (fn) => {
+      await qc.cancelQueries({ queryKey: ['files', category.key] })
+      const previous = qc.getQueryData(['files', category.key])
+      qc.setQueryData(['files', category.key], (old: FileEntry[] = []) => old.filter(f => f.name !== fn))
+      setDeletingFile(null)
+      return { previous }
+    },
+    onError: (_err, _fn, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['files', category.key], ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['files', category.key] }),
   })
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (fns: string[]) => { await Promise.all(fns.map(fn => api.deleteFile(category.key, fn))) },
-    onSuccess: () => { setSelected(new Set()); qc.invalidateQueries({ queryKey: ['files', category.key] }) },
+    onMutate: async (fns) => {
+      await qc.cancelQueries({ queryKey: ['files', category.key] })
+      const previous = qc.getQueryData(['files', category.key])
+      const toDelete = new Set(fns)
+      qc.setQueryData(['files', category.key], (old: FileEntry[] = []) => old.filter(f => !toDelete.has(f.name)))
+      setSelected(new Set())
+      return { previous }
+    },
+    onError: (_err, _fns, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['files', category.key], ctx.previous)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['files', category.key] }),
   })
 
   function handleFiles(fl: FileList | null) {
