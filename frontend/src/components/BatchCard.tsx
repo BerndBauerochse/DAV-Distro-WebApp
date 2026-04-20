@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, Play, Trash2, ChevronDown } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Play, Trash2, ChevronDown, AlertTriangle } from 'lucide-react'
 import type { BatchPreview, BookInfo } from '../types'
 
 const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
@@ -19,7 +19,7 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
 
 interface Props {
   preview: BatchPreview
-  onStart: (portal: string) => void
+  onStart: (portal: string, takedown: boolean) => void
   onRemove: () => void
   isStarting: boolean
 }
@@ -42,6 +42,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const [selectedPortal, setSelectedPortal] = useState(
     preview.portal_variants[0]?.key ?? preview.detected_portal
   )
+  const [takedown, setTakedown] = useState(false)
 
   const missingCount = preview.books.filter(b => !b.zip_available).length
   const totalCount   = preview.books.length
@@ -84,13 +85,27 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
               {missingCount} ZIP fehlt{missingCount > 1 ? 'en' : ''}
             </span>
           )}
+          {/* Takedown toggle */}
           <button
-            onClick={() => onStart(selectedPortal)}
+            onClick={() => setTakedown(v => !v)}
+            title="Takedown: nur Metadaten senden"
+            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors"
+            style={takedown
+              ? { background: 'rgba(251,146,60,0.2)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)' }
+              : { background: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.08)' }
+            }
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Takedown
+          </button>
+          <button
+            onClick={() => onStart(selectedPortal, takedown)}
             disabled={isStarting || totalCount === 0}
             className="btn-accent flex items-center gap-1.5 py-1.5 px-3"
+            style={takedown ? { background: 'rgba(251,146,60,0.8)' } : {}}
           >
             {isStarting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            Starten
+            {takedown ? 'Takedown' : 'Starten'}
           </button>
           <button
             onClick={onRemove}
