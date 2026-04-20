@@ -14,24 +14,44 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
   const [copied, setCopied] = useState(false)
   const [attachmentError, setAttachmentError] = useState('')
 
+  function htmlToPlainText(html: string): string {
+    return html
+      // Block elements → newlines before stripping
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      // Table rows → newline after each row
+      .replace(/<\/tr>/gi, '\n')
+      // Table cells/headers → tab separator (produces readable columns)
+      .replace(/<\/th>/gi, '\t')
+      .replace(/<\/td>/gi, '\t')
+      // Strip all remaining tags
+      .replace(/<[^>]+>/g, '')
+      // Decode HTML entities
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      // Clean up trailing tabs on each line
+      .replace(/\t+\n/g, '\n')
+      // Collapse 3+ blank lines to 2
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
   function buildMailtoLink() {
     const to = encodeURIComponent(draft.to)
     const subject = encodeURIComponent(draft.subject)
-    // For HTML mails use plain text body (HTML tags not supported in mailto)
-    const plainBody = draft.is_html
-      ? draft.body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s{2,}/g, ' ').trim()
-      : draft.body
+    const plainBody = draft.is_html ? htmlToPlainText(draft.body) : draft.body
     const body = encodeURIComponent(plainBody)
     return `mailto:${to}?subject=${subject}&body=${body}`
   }
 
   async function copyBody() {
     try {
-      if (draft.is_html) {
-        await navigator.clipboard.writeText(draft.body)
-      } else {
-        await navigator.clipboard.writeText(draft.body)
-      }
+      const text = draft.is_html ? htmlToPlainText(draft.body) : draft.body
+      await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
