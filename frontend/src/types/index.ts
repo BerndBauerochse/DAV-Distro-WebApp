@@ -87,7 +87,12 @@ export interface RunUpdateEvent {
   mail_draft?: MailDraft
 }
 
-export type WsEvent = ProgressEvent | RunUpdateEvent
+export interface NewMetadataFileEvent {
+  type: 'new_metadata_file'
+  filename: string
+}
+
+export type WsEvent = ProgressEvent | RunUpdateEvent | NewMetadataFileEvent
 
 export interface FileEntry {
   name: string

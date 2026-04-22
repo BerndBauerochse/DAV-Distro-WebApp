@@ -1,8 +1,16 @@
-import { forwardRef, useImperativeHandle, useRef, useState, useCallback } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect } from 'react'
 import { Upload, Loader2, Play } from 'lucide-react'
 import { BatchCard } from './BatchCard'
 import { api } from '../api/client'
 import type { BatchPreview } from '../types'
+
+const BATCH_STORAGE_KEY = 'dav_batch_queue'
+
+interface PersistedBatch {
+  id: string
+  serverFilename: string
+  preview: BatchPreview | null
+}
 
 interface BatchEntry {
   id: string
@@ -24,8 +32,36 @@ interface Props {
 export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function BatchBuilder({ onStarted }, ref) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
-  const [batches, setBatches] = useState<BatchEntry[]>([])
+  const [batches, setBatches] = useState<BatchEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem(BATCH_STORAGE_KEY)
+      if (!saved) return []
+      const parsed: PersistedBatch[] = JSON.parse(saved)
+      return parsed.map(p => ({
+        id: p.id,
+        file: null,
+        serverFilename: p.serverFilename,
+        preview: p.preview,
+        loading: false,
+        error: null,
+      }))
+    } catch {
+      return []
+    }
+  })
   const [startingIds, setStartingIds] = useState<Set<string>>(new Set())
+  const batchesRef = useRef(batches)
+
+  useEffect(() => {
+    batchesRef.current = batches
+  }, [batches])
+
+  useEffect(() => {
+    const toSave: PersistedBatch[] = batches
+      .filter(b => b.serverFilename != null && !b.loading)
+      .map(b => ({ id: b.id, serverFilename: b.serverFilename!, preview: b.preview }))
+    localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(toSave))
+  }, [batches])
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
     const fileArr = Array.from(files)
@@ -53,6 +89,7 @@ export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function Batch
   }, [])
 
   const addServerFile = useCallback(async (filename: string) => {
+    if (batchesRef.current.some(b => b.serverFilename === filename)) return
     const entry: BatchEntry = {
       id: `${Date.now()}-${Math.random()}`,
       file: null,

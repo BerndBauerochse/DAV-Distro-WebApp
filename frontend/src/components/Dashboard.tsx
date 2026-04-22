@@ -9,7 +9,7 @@ import type { DeliveryRun, WsEvent, ActiveTransfer, MailDraft } from '../types'
 
 interface Props {
   onMailDraft: (runId: string, draft: MailDraft, portalName: string) => void
-  batchBuilderRef?: React.Ref<BatchBuilderHandle>
+  batchBuilderRef?: React.RefObject<BatchBuilderHandle>
 }
 
 export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
@@ -30,6 +30,11 @@ export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
   }, [initialRuns])
 
   const handleWsEvent = useCallback((event: WsEvent) => {
+    if (event.type === 'new_metadata_file') {
+      batchBuilderRef?.current?.addServerFile(event.filename)
+      return
+    }
+
     if (event.type === 'run_update') {
       if (event.status === 'running') {
         setActiveRuns(prev => {

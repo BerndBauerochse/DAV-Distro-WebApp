@@ -1,5 +1,7 @@
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,6 +10,7 @@ from app.routers import runs, portals, files as files_router
 from app.routers import auth as auth_router
 from app.routers import users as users_router
 from app.websocket_manager import ws_manager
+from app.services.file_watcher import start_file_watcher
 from app.auth import JWT_SECRET, ALGORITHM
 from jose import JWTError, jwt
 
@@ -29,6 +32,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     await init_db()
     logger.info("Database initialized")
+    storage_root = Path(os.getenv("STORAGE_DIR", "/storage"))
+    start_file_watcher(storage_root)
     yield
 
 
