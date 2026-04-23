@@ -48,6 +48,13 @@ def _category_path(category: str) -> Path:
     return CATEGORIES[category]
 
 
+def _safe_filename(filename: str) -> str:
+    name = Path(filename).name
+    if not name or name in {".", ".."} or name != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return name
+
+
 # ── List ──────────────────────────────────────────────────────────────────────
 
 @router.get("/{category}", response_model=list[FileEntry])
@@ -76,6 +83,7 @@ async def upload_chunk(
     _user: str = Depends(get_current_user),
 ):
     folder = _category_path(category)
+    filename = _safe_filename(filename)
     CHUNK_TEMP.mkdir(parents=True, exist_ok=True)
 
     # Stream raw body directly to disk — no buffering, no multipart overhead
@@ -130,6 +138,7 @@ def _make_thumb(src: Path, dest: Path) -> None:
 @router.get("/covers/{filename}/thumb")
 async def cover_thumbnail(filename: str, _user: str = Depends(get_current_user)):
     folder = _category_path("covers")
+    filename = _safe_filename(filename)
     src = folder / filename
     if not src.exists() or not src.is_file():
         raise HTTPException(status_code=404, detail="File not found")
@@ -149,6 +158,7 @@ async def cover_thumbnail(filename: str, _user: str = Depends(get_current_user))
 @router.get("/{category}/{filename}/download")
 async def download_file(category: str, filename: str, _user: str = Depends(get_current_user)):
     folder = _category_path(category)
+    filename = _safe_filename(filename)
     dest = folder / filename
     if not dest.exists() or not dest.is_file():
         raise HTTPException(status_code=404, detail="File not found")
@@ -160,6 +170,7 @@ async def download_file(category: str, filename: str, _user: str = Depends(get_c
 @router.delete("/{category}/{filename}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(category: str, filename: str, _user: str = Depends(get_current_user)):
     folder = _category_path(category)
+    filename = _safe_filename(filename)
     dest = folder / filename
     if not dest.exists() or not dest.is_file():
         raise HTTPException(status_code=404, detail="File not found")

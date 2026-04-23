@@ -233,10 +233,10 @@ def _parse_zebra_excel(file_path: str, source_dir: str) -> list[BookInfo]:
             title  = str(row.get("AlbumTitle_SeriesTitle", "")).strip()
             author = str(row.get("InfoAuthors", "")).strip()
             raw_ab = str(row.get("InfoMediaVariant", "")).strip().lower()
-            if "gekürzt" in raw_ab or "gek\u00fcrzt" in raw_ab:
-                abridged: bool | None = True
-            elif "ungekürzt" in raw_ab or "ungek\u00fcrzt" in raw_ab:
+            if "ungekürzt" in raw_ab or "ungek\u00fcrzt" in raw_ab or "unabridged" in raw_ab:
                 abridged = False
+            elif "gekürzt" in raw_ab or "gek\u00fcrzt" in raw_ab or "abridged" in raw_ab:
+                abridged = True
             else:
                 abridged = None
             zip_available = os.path.isfile(os.path.join(source_dir, f"{ean}.zip"))

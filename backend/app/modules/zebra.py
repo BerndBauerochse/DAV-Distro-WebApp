@@ -14,6 +14,7 @@ import logging
 import os
 import shutil
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from zipfile import ZipFile
@@ -25,6 +26,8 @@ from app.modules.ftp_helper import sftp_connection, sftp_upload, sftp_makedirs
 from app.services.delivery_service import register_portal
 
 PARALLEL_UPLOADS = 4  # concurrent SFTP connections for audio files
+UPLOAD_RETRIES = 3
+RETRY_DELAY_SECONDS = 2
 
 logger = logging.getLogger(__name__)
 
@@ -136,36 +139,57 @@ class ZebraModule(BasePortalModule):
             with _lock:
                 progress_cb(*args, **kwargs)
 
+        def upload_with_retries(t: FileTransfer) -> None:
+            last_error: Exception | None = None
+            for attempt in range(1, UPLOAD_RETRIES + 1):
+                try:
+                    with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
+                        safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
+                        sftp_upload(
+                            sftp,
+                            t.source_path,
+                            t.destination,
+                            progress_cb=lambda cur, tot, _t=t: safe_cb(
+                                run_id, _t.ean, _t.file_name, _t.file_type, cur, tot, "uploading"
+                            ),
+                        )
+                        safe_cb(
+                            run_id, t.ean, t.file_name, t.file_type,
+                            t.file_size_bytes, t.file_size_bytes, "success"
+                        )
+                    return
+                except Exception as e:
+                    last_error = e
+                    if attempt < UPLOAD_RETRIES:
+                        logger.warning(
+                            "Zebra upload retry %s/%s failed for %s: %s",
+                            attempt,
+                            UPLOAD_RETRIES,
+                            t.file_name,
+                            e,
+                        )
+                        time.sleep(RETRY_DELAY_SECONDS)
+                    else:
+                        logger.error(
+                            "Zebra upload failed after %s attempts for %s: %s",
+                            UPLOAD_RETRIES,
+                            t.file_name,
+                            e,
+                        )
+
+            safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(last_error))
+
         # 1. Single connection: create all remote directories + upload metadata
         remote_dirs = {os.path.dirname(t.destination).replace("\\", "/") for t in audio}
         with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
             for d in sorted(remote_dirs):
                 sftp_makedirs(sftp, d)
             for t in metadata:
-                try:
-                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
-                    sftp_upload(sftp, t.source_path, t.destination,
-                        progress_cb=lambda cur, tot, _t=t: safe_cb(
-                            run_id, _t.ean, _t.file_name, _t.file_type, cur, tot, "uploading"
-                        ))
-                    safe_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
-                except Exception as e:
-                    logger.error(f"Zebra metadata upload failed {t.file_name}: {e}")
-                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+                upload_with_retries(t)
 
         # 2. Upload audio files in parallel — each worker gets its own SFTP connection
         def _upload_audio(t: FileTransfer):
-            with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
-                try:
-                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
-                    sftp_upload(sftp, t.source_path, t.destination,
-                        progress_cb=lambda cur, tot, _t=t: safe_cb(
-                            run_id, _t.ean, _t.file_name, _t.file_type, cur, tot, "uploading"
-                        ))
-                    safe_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
-                except Exception as e:
-                    logger.error(f"Zebra upload failed {t.file_name}: {e}")
-                    safe_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+            upload_with_retries(t)
 
         with ThreadPoolExecutor(max_workers=PARALLEL_UPLOADS) as pool:
             futures = {pool.submit(_upload_audio, t): t for t in audio}

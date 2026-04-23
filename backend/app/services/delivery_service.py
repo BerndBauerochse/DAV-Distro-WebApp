@@ -42,6 +42,10 @@ def request_cancel(run_id: str) -> None:
     if event:
         event.set()
 
+
+def clear_metadata_path(run_id: str) -> None:
+    _run_metadata_paths.pop(str(run_id), None)
+
 PORTAL_DISPLAY_NAMES = {
     "audible": "Audible",
     "audible_moa": "Audible MoA",
@@ -346,6 +350,8 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
     finally:
         _cancel_events.pop(str(run_id), None)
+        if final_status != "completed":
+            clear_metadata_path(run_id)
 
     # Collect mail draft if module supports it (only on success)
     mail_draft = None

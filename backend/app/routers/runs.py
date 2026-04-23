@@ -1,6 +1,7 @@
 import io
 import os
 import uuid
+from pathlib import Path
 import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse
@@ -10,13 +11,27 @@ from sqlalchemy import select, desc, delete as sql_delete
 from app.database import get_db, AsyncSessionLocal
 from app.models import DeliveryRun, DeliveryLog
 from app.schemas import DeliveryRunOut, DeliveryRunDetail, DeliveryLogOut
-from app.services.delivery_service import start_delivery_run, load_config, PORTAL_REGISTRY, get_metadata_path, request_cancel
+from app.services.delivery_service import (
+    start_delivery_run,
+    load_config,
+    PORTAL_REGISTRY,
+    get_metadata_path,
+    request_cancel,
+    clear_metadata_path,
+)
 from app.modules.metadata_parser import parse_metadata
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/uploads")
+
+
+def _safe_filename(filename: str) -> str:
+    name = Path(filename).name
+    if not name or name in {".", ".."} or name != filename:
+        raise HTTPException(status_code=400, detail="Ungültiger Dateiname")
+    return name
 
 
 @router.get("", response_model=list[DeliveryRunOut])
@@ -141,11 +156,12 @@ async def preview_metadata(
         temp_path = server_path
         filename = os.path.basename(metadata_server_file)
     elif metadata_file and metadata_file.filename:
-        suffix = _Path(metadata_file.filename).suffix or ".xml"
+        safe_name = _safe_filename(metadata_file.filename)
+        suffix = _Path(safe_name).suffix or ".xml"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
             f.write(await metadata_file.read())
             temp_path = f.name
-        filename = metadata_file.filename
+        filename = safe_name
         cleanup = True
     else:
         raise HTTPException(status_code=422, detail="Keine Metadatei angegeben")
@@ -205,7 +221,8 @@ async def check_run(
         if os.path.isfile(server_path):
             temp_path = server_path
     elif metadata_file and metadata_file.filename:
-        suffix = _Path(metadata_file.filename).suffix or ".xml"
+        safe_name = _safe_filename(metadata_file.filename)
+        suffix = _Path(safe_name).suffix or ".xml"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
             f.write(await metadata_file.read())
             temp_path = f.name
@@ -245,7 +262,7 @@ async def start_run(
         metadata_filename = os.path.basename(metadata_server_file)
         metadata_path = server_path
     elif metadata_file and metadata_file.filename:
-        metadata_filename = metadata_file.filename
+        metadata_filename = _safe_filename(metadata_file.filename)
         upload_subdir = os.path.join(UPLOAD_DIR, str(uuid.uuid4()))
         os.makedirs(upload_subdir, exist_ok=True)
         dest = os.path.join(upload_subdir, metadata_filename)
@@ -263,9 +280,14 @@ async def start_run(
 @router.get("/{run_id}/metadata/download")
 async def download_run_metadata(
     run_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     """Serve the uploaded metadata file for a run (used as mail attachment)."""
+    run = await db.get(DeliveryRun, run_id)
+    if not run:
+        clear_metadata_path(str(run_id))
+        raise HTTPException(status_code=404, detail="Run not found")
     path = get_metadata_path(str(run_id))
     if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Metadatei nicht (mehr) verfügbar")
@@ -296,3 +318,4 @@ async def delete_run(
     await db.execute(sql_delete(DeliveryLog).where(DeliveryLog.run_id == run_id))
     await db.delete(run)
     await db.commit()
+    clear_metadata_path(str(run_id))

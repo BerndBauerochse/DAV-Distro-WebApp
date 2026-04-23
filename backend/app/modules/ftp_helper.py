@@ -24,8 +24,14 @@ def sftp_connection(host: str, port: int, username: str, password: str):
         yield sftp
     finally:
         if sftp:
-            sftp.close()
-        transport.close()
+            try:
+                sftp.close()
+            except Exception as e:
+                logger.warning("SFTP close warning for %s:%s: %s", host, port, e)
+        try:
+            transport.close()
+        except Exception as e:
+            logger.warning("SFTP transport close warning for %s:%s: %s", host, port, e)
 
 
 def sftp_upload(
