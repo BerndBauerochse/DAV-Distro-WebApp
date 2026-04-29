@@ -352,3 +352,62 @@
   animation: shimmer 1.8s infinite;
   border-radius: 8px;
 }
+
+/* ── Mobile Components (hidden by default) ───────────────────── */
+.shell-mobile-header { display: none; }
+.shell-mobile-nav    { display: none; }
+
+/* ── Mobile Responsive (≤ 767px) ────────────────────────────── */
+@media (max-width: 767px) {
+  .app-shell {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    flex-direction: column;
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .shell-sidebar { display: none; }
+
+  .shell-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 1rem;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(9, 13, 32, 0.9);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .shell-mobile-nav {
+    display: flex;
+    flex-shrink: 0;
+    border-top: 1px solid var(--glass-border);
+    background: var(--sidebar-bg);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Shrink orbs on mobile to avoid performance issues */
+  .orb-1 { width: 300px; height: 300px; top: -100px; left: -100px; }
+  .orb-2 { width: 200px; height: 200px; }
+  .orb-3 { width: 150px; height: 150px; }
+
+  /* Tighter scrollbar on touch */
+  ::-webkit-scrollbar { width: 2px; height: 2px; }
+}
+
+/* ── Desktop shell dimensions (≥ 768px) ─────────────────────── */
+@media (min-width: 768px) {
+  .app-shell {
+    width: min(1580px, calc(100vw - 64px));
+    height: calc(100dvh - 56px);
+    border-radius: 26px;
+  }
+}

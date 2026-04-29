@@ -148,7 +148,38 @@ export function App() {
           {/* ── Floating App Shell ─────────────────────── */}
           <div className="app-shell">
 
-            {/* Sidebar */}
+            {/* Mobile top bar — hidden on desktop via CSS */}
+            <div className="shell-mobile-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <img src="/logo.png" alt="DAV" style={{ width: '1.75rem', height: '1.75rem', objectFit: 'contain' }} />
+                <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-100)' }}>
+                  DAV
+                </span>
+              </div>
+              <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-100)' }}>
+                {title}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <div
+                  style={{ width: '2rem', height: '2rem', borderRadius: '0.5rem', overflow: 'hidden', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', flexShrink: 0 }}
+                  onClick={() => avatarRef.current?.click()}>
+                  {avatar
+                    ? <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)' }}>
+                        <span style={{ fontFamily: 'Manrope, sans-serif', fontWeight: 700, color: 'white', fontSize: '0.6875rem', textTransform: 'uppercase' }}>
+                          {auth.username?.charAt(0) ?? '?'}
+                        </span>
+                      </div>
+                  }
+                </div>
+                <button onClick={logout} title="Abmelden"
+                  style={{ padding: '0.375rem', borderRadius: '0.5rem', color: 'var(--text-400)', display: 'flex', alignItems: 'center' }}>
+                  <LogOut style={{ width: '1rem', height: '1rem' }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Sidebar — hidden on mobile via CSS */}
             <aside className="shell-sidebar">
 
               {/* Logo — vertical brand block */}
@@ -275,9 +306,9 @@ export function App() {
 
             {/* Main */}
             <main className="shell-main">
-              <div className="px-8 py-7" style={{ minHeight: '100%' }}>
-                {/* Page header */}
-                <div className="mb-7 fade-up">
+              <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 md:py-7" style={{ minHeight: '100%' }}>
+                {/* Page header — hidden on mobile (title shown in mobile top bar) */}
+                <div className="mb-5 sm:mb-7 fade-up hidden md:block">
                   <h1 style={{
                     fontFamily: 'Manrope, sans-serif', fontWeight: 800, fontSize: '1.625rem',
                     letterSpacing: '-0.02em', color: 'var(--text-100)', lineHeight: 1.1
@@ -291,6 +322,31 @@ export function App() {
                 <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager onUseForDelivery={handleUseForDelivery} activeTab={fileTab} onTabChange={setFileTab} /></div>
               </div>
             </main>
+
+            {/* Mobile bottom nav — hidden on desktop via CSS */}
+            <nav className="shell-mobile-nav">
+              {NAV.map(item => {
+                const active = page === item.id
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setPage(item.id)}
+                    style={{
+                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: '0.2rem', padding: '0.5rem 0.25rem',
+                      color: active ? '#a78bfa' : 'var(--text-400)',
+                      transition: 'color 0.15s',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                    }}
+                  >
+                    {item.icon}
+                    <span style={{ fontSize: '0.625rem', fontWeight: active ? 600 : 400, fontFamily: 'Manrope, sans-serif' }}>
+                      {item.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
 
           </div>{/* /app-shell */}
         </div>{/* /app-stage */}

@@ -148,7 +148,7 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
         onDragLeave={() => setDragOver(false)}
         onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
         onClick={() => inputRef.current?.click()}
-        className="rounded-2xl p-8 text-center cursor-pointer transition-all duration-200"
+        className="rounded-2xl p-4 sm:p-8 text-center cursor-pointer transition-all duration-200"
         style={{
           border: `2px dashed ${dragOver ? 'rgba(34,211,238,0.6)' : 'rgba(255,255,255,0.1)'}`,
           background: dragOver ? 'rgba(34,211,238,0.05)' : 'rgba(255,255,255,0.02)',
@@ -246,7 +246,7 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
             </button>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Alle auswählen</span>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {files.map((f: FileEntry) => (
               <div key={f.name}
                 className="relative group rounded-xl overflow-hidden cursor-pointer transition-all duration-150"
@@ -334,7 +334,7 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
                   {fmtBytes(f.size)} · {fmtDate(f.modified)}
                 </p>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                 {category.key === 'metadata' && onUseForDelivery && (
                   <button
                     onClick={() => onUseForDelivery(f.name)}
@@ -396,11 +396,12 @@ export function FileManager({ onUseForDelivery, activeTab = 'zips', onTabChange 
 
   return (
     <div className="space-y-5">
-      {/* Tab bar */}
+      {/* Tab bar — scrollable on mobile */}
+      <div className="overflow-x-auto pb-0.5">
       <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid var(--glass-border)' }}>
         {CATEGORIES.map(cat => (
           <button key={cat.key} onClick={() => setActiveTab(cat.key)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150"
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap"
             style={activeTab === cat.key
               ? { background: '#6d28d9', color: '#ffffff', border: '1px solid #7c3aed' }
               : { color: 'var(--text-muted)', border: '1px solid transparent' }
@@ -413,6 +414,7 @@ export function FileManager({ onUseForDelivery, activeTab = 'zips', onTabChange 
           </button>
         ))}
       </div>
+      </div>{/* /overflow-x-auto */}
 
       {/* Panel */}
       <div className="glass-card p-6">
