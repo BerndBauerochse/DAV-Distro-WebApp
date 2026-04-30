@@ -39,12 +39,15 @@ async def list_runs(
     portal: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    initiated_by: str | None = None,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     q = select(DeliveryRun).order_by(desc(DeliveryRun.started_at)).limit(limit).offset(offset)
     if portal:
         q = q.where(DeliveryRun.portal == portal)
+    if initiated_by:
+        q = q.where(DeliveryRun.initiated_by == initiated_by)
     result = await db.execute(q)
     return result.scalars().all()
 

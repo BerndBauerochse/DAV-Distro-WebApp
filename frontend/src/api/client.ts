@@ -38,9 +38,10 @@ export const api = {
     })
   },
 
-  getRuns(portal?: string, limit = 50, offset = 0): Promise<DeliveryRun[]> {
+  getRuns(portal?: string, limit = 50, offset = 0, initiated_by?: string): Promise<DeliveryRun[]> {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (portal) params.set('portal', portal)
+    if (initiated_by) params.set('initiated_by', initiated_by)
     return request(`/runs?${params}`)
   },
 

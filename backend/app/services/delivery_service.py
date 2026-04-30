@@ -111,6 +111,7 @@ async def start_delivery_run(
         "completed_files": 0,
         "failed_files": 0,
         "skipped_files": 0,
+        "initiated_by": initiated_by,
     })
 
     # Run in background thread so async loop stays free
@@ -153,7 +154,7 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
         ).result()
         asyncio.run_coroutine_threadsafe(
             _finalize_run(db_session_factory, run_id, portal_key, "failed",
-                          error_message=error_message), loop
+                          error_message=error_message, initiated_by=initiated_by), loop
         ).result()
         return
 
@@ -210,6 +211,7 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
                 "completed_files": 0,
                 "failed_files": 0,
                 "skipped_files": 0,
+                "initiated_by": initiated_by,
             }),
             loop,
         ).result()
@@ -370,7 +372,8 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
     asyncio.run_coroutine_threadsafe(
         _finalize_run(db_session_factory, run_id, portal_key, final_status,
-                      total, completed, failed, skipped, error_message, mail_draft),
+                      total, completed, failed, skipped, error_message, mail_draft,
+                      initiated_by=initiated_by),
         loop,
     ).result()
 
@@ -421,6 +424,7 @@ async def _update_run_counts(db_session_factory, run_id, total, completed, faile
 async def _finalize_run(
     db_session_factory, run_id, portal_key, status,
     total=0, completed=0, failed=0, skipped=0, error_message=None, mail_draft=None,
+    initiated_by=None,
 ):
     async with db_session_factory() as db:
         await db.execute(
@@ -447,6 +451,7 @@ async def _finalize_run(
         "completed_files": completed,
         "failed_files": failed,
         "skipped_files": skipped,
+        "initiated_by": initiated_by,
     }
     if error_message:
         msg["error"] = error_message

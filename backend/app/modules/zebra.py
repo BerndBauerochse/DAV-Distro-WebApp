@@ -51,6 +51,21 @@ class ZebraModule(BasePortalModule):
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         os.makedirs(self.export_dir, exist_ok=True)
+
+        # Remove extracted files from previous runs so stale audio files are not re-delivered
+        for entry in os.listdir(self.export_dir):
+            if entry.lower().endswith(".xlsx"):
+                continue
+            entry_path = os.path.join(self.export_dir, entry)
+            try:
+                if os.path.isdir(entry_path):
+                    shutil.rmtree(entry_path)
+                else:
+                    os.remove(entry_path)
+                logger.info("Zebra: Bereinigt alten Eintrag: %s", entry_path)
+            except Exception as e:
+                logger.warning("Zebra: Konnte %s nicht bereinigen: %s", entry_path, e)
+
         transfers: list[FileTransfer] = []
 
         # Find Excel (metadata_path takes precedence)

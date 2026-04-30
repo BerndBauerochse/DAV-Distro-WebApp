@@ -85,6 +85,7 @@ export interface RunUpdateEvent {
   failed_files: number
   skipped_files: number
   mail_draft?: MailDraft
+  initiated_by?: string | null
 }
 
 export interface NewMetadataFileEvent {

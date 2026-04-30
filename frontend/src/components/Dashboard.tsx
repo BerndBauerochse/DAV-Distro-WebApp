@@ -4,6 +4,7 @@ import { Activity, Zap } from 'lucide-react'
 import { ActiveRunCard } from './ActiveRunCard'
 import { BatchBuilder, type BatchBuilderHandle } from './BatchBuilder'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { useAuth } from '../hooks/useAuth'
 import { api } from '../api/client'
 import type { DeliveryRun, WsEvent, ActiveTransfer, MailDraft } from '../types'
 
@@ -14,12 +15,15 @@ interface Props {
 
 export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
   const qc = useQueryClient()
+  const { auth } = useAuth()
+  const currentUser = auth.username ?? ''
   const [activeRuns, setActiveRuns] = useState<Map<string, DeliveryRun>>(new Map())
   const [transfers, setTransfers] = useState<Map<string, ActiveTransfer[]>>(new Map())
 
   const { data: initialRuns } = useQuery({
-    queryKey: ['active-runs'],
-    queryFn: () => api.getRuns(undefined, 20, 0),
+    queryKey: ['active-runs', currentUser],
+    queryFn: () => api.getRuns(undefined, 20, 0, currentUser),
+    enabled: !!currentUser,
   })
 
   useEffect(() => {
@@ -36,6 +40,8 @@ export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
     }
 
     if (event.type === 'run_update') {
+      // Only show runs started by the current user in the dashboard
+      if (event.initiated_by && event.initiated_by !== currentUser) return
       if (event.status === 'running') {
         setActiveRuns(prev => {
           const next = new Map(prev)
