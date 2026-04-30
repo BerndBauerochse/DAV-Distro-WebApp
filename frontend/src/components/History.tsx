@@ -110,7 +110,8 @@ export function History() {
         </div>
       ) : (
         <div className="glass-card overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: '640px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
                 {['', 'Portal', 'Metadatei', 'Status', 'Dateien', 'Benutzer', 'Gestartet', 'Dauer', ''].map((h, i) => (
@@ -151,6 +152,7 @@ export function History() {
               </button>
             </div>
           )}
+          </div>{/* /overflow-x-auto */}
         </div>
       )}
     </div>

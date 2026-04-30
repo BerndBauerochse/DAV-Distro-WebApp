@@ -52,7 +52,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   return (
     <div className="glass-card overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3"
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3"
         style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.15)' }}>
         <div className="flex items-center gap-3 min-w-0">
           {hasVariants ? (

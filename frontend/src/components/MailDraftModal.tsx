@@ -95,7 +95,7 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
       <div className="glass-card w-full max-w-lg overflow-hidden fade-up">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4"
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4"
           style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)' }}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -120,7 +120,7 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
         </div>
 
         {/* Mail info */}
-        <div className="px-6 py-5 space-y-3">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-3">
           <div className="rounded-xl p-3 space-y-1"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>An</p>
@@ -165,7 +165,7 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 flex items-center justify-end gap-3"
+        <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-end gap-3"
           style={{ borderTop: '1px solid var(--glass-border)' }}>
           <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
             Schließen
