@@ -3,7 +3,7 @@ export interface DeliveryRun {
   portal: string
   metadata_filename: string | null
   initiated_by: string | null
-  takedown: boolean
+  takedown?: boolean
   status: 'running' | 'completed' | 'failed' | 'cancelled'
   total_files: number
   completed_files: number
