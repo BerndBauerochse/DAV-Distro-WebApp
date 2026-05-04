@@ -189,7 +189,15 @@ function RunRow({ run, portalName, expanded, onToggle, onDelete, onCancel, isDel
             : <ChevronRight className="w-4 h-4" />}
         </td>
         <td className="px-4 py-3">
-          <span className="font-semibold text-white/85">{portalName}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-white/85">{portalName}</span>
+            {run.takedown && (
+              <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                style={{ background: 'rgba(251,146,60,0.18)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.35)' }}>
+                Takedown
+              </span>
+            )}
+          </div>
         </td>
         <td className="px-4 py-3 max-w-xs truncate" style={{ color: 'var(--text-secondary)' }}>
           {run.metadata_filename ?? <span style={{ color: 'var(--text-muted)' }}>—</span>}

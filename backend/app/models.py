@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, DateTime, BigInteger, Integer, ForeignKey
+from sqlalchemy import String, Text, DateTime, BigInteger, Integer, Boolean, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -16,6 +16,7 @@ class DeliveryRun(Base):
     portal: Mapped[str] = mapped_column(String, nullable=False, index=True)
     metadata_filename: Mapped[str | None] = mapped_column(String)
     initiated_by: Mapped[str | None] = mapped_column(String)
+    takedown: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="running")
     # running | completed | failed | cancelled
     total_files: Mapped[int] = mapped_column(Integer, default=0)

@@ -74,6 +74,7 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
   const [dragOver, setDragOver] = useState(false)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [coverSort, setCoverSort] = useState<'newest' | 'oldest' | 'ean_asc' | 'ean_desc'>('newest')
   const { uploads, startUpload } = useUpload()
 
   const { data: files = [], isLoading, isError } = useQuery({
@@ -139,6 +140,16 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
   const totalSize = files.reduce((s: number, f: FileEntry) => s + f.size, 0)
   const isCovers = category.key === 'covers'
   const allSelected = files.length > 0 && selected.size === files.length
+
+  const sortedFiles: FileEntry[] = isCovers
+    ? [...files].sort((a, b) => {
+        if (coverSort === 'newest') return b.modified - a.modified
+        if (coverSort === 'oldest') return a.modified - b.modified
+        const ea = extractEan(a.name) ?? a.name
+        const eb = extractEan(b.name) ?? b.name
+        return coverSort === 'ean_asc' ? ea.localeCompare(eb) : eb.localeCompare(ea)
+      })
+    : files
 
   return (
     <div className="space-y-4">
@@ -240,14 +251,28 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
       {/* Cover grid */}
       {isCovers && files.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
             <button onClick={toggleAll} style={{ color: allSelected ? '#22d3ee' : 'var(--text-muted)' }}>
               {allSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
             </button>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Alle auswählen</span>
+
+            {/* Sort controls */}
+            <div className="ml-auto flex items-center gap-1">
+              {([ ['newest', 'Neu'], ['oldest', 'Alt'], ['ean_asc', 'EAN ↑'], ['ean_desc', 'EAN ↓'] ] as const).map(([key, label]) => (
+                <button key={key} onClick={() => setCoverSort(key)}
+                  className="text-xs px-2 py-1 rounded-lg transition-colors"
+                  style={coverSort === key
+                    ? { background: 'rgba(109,40,217,0.3)', color: '#a78bfa', border: '1px solid rgba(109,40,217,0.4)' }
+                    : { color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.06)' }
+                  }>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-            {files.map((f: FileEntry) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {sortedFiles.map((f: FileEntry) => (
               <div key={f.name}
                 className="relative group rounded-xl overflow-hidden cursor-pointer transition-all duration-150"
                 style={{

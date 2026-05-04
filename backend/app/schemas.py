@@ -54,6 +54,7 @@ class DeliveryRunOut(BaseModel):
     portal: str
     metadata_filename: str | None
     initiated_by: str | None
+    takedown: bool = False
     status: str
     total_files: int
     completed_files: int

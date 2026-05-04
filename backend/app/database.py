@@ -23,6 +23,10 @@ async def init_db():
         await conn.execute(text(
             "ALTER TABLE delivery_runs ADD COLUMN IF NOT EXISTS mail_draft JSONB"
         ))
+        # Migration: add takedown flag
+        await conn.execute(text(
+            "ALTER TABLE delivery_runs ADD COLUMN IF NOT EXISTS takedown BOOLEAN NOT NULL DEFAULT FALSE"
+        ))
         # Migration: user_settings table (avatar storage)
         await conn.execute(text(
             "CREATE TABLE IF NOT EXISTS user_settings "
