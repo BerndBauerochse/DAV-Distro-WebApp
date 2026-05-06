@@ -40,9 +40,9 @@ export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
     }
 
     if (event.type === 'run_update') {
-      // Only show runs started by the current user in the dashboard
-      if (event.initiated_by && event.initiated_by !== currentUser) return
       if (event.status === 'running') {
+        // Only add runs to this dashboard that were started by the current user
+        if (event.initiated_by && event.initiated_by !== currentUser) return
         setActiveRuns(prev => {
           const next = new Map(prev)
           const existing = next.get(event.run_id)
@@ -62,10 +62,12 @@ export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
           return next
         })
       } else {
+        // Always remove finished runs from all dashboards
         setActiveRuns(prev => { const n = new Map(prev); n.delete(event.run_id); return n })
         setTransfers(prev => { const n = new Map(prev); n.delete(event.run_id); return n })
         qc.invalidateQueries({ queryKey: ['runs'] })
-        if (event.mail_draft) {
+        // Only show mail draft to the user who initiated the run
+        if (event.mail_draft && (!event.initiated_by || event.initiated_by === currentUser)) {
           const portalName = event.portal.charAt(0).toUpperCase() + event.portal.slice(1)
           onMailDraft(event.run_id, event.mail_draft, portalName)
         }
