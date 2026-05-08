@@ -113,6 +113,7 @@ async def start_delivery_run(
         "failed_files": 0,
         "skipped_files": 0,
         "initiated_by": initiated_by,
+        "metadata_filename": metadata_filename,
     })
 
     # Run in background thread so async loop stays free

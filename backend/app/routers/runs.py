@@ -21,6 +21,7 @@ from app.services.delivery_service import (
 )
 from app.modules.metadata_parser import parse_metadata
 from app.auth import get_current_user
+from app.websocket_manager import ws_manager
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -56,6 +57,7 @@ async def list_runs(
 async def export_runs(
     format: str = "csv",
     portal: str | None = None,
+    initiated_by: str | None = None,
     db: AsyncSession = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
@@ -65,6 +67,8 @@ async def export_runs(
     q = select(DeliveryRun).order_by(desc(DeliveryRun.started_at))
     if portal:
         q = q.where(DeliveryRun.portal == portal)
+    if initiated_by:
+        q = q.where(DeliveryRun.initiated_by == initiated_by)
     result = await db.execute(q)
     runs = result.scalars().all()
 
@@ -322,3 +326,4 @@ async def delete_run(
     await db.delete(run)
     await db.commit()
     clear_metadata_path(str(run_id))
+    await ws_manager.broadcast({"type": "run_deleted", "run_id": str(run_id)})

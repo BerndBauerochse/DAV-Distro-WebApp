@@ -23,6 +23,7 @@ interface BatchEntry {
 
 export interface BatchBuilderHandle {
   addServerFile: (filename: string) => void
+  removeServerFile: (filename: string) => void
 }
 
 interface Props {
@@ -109,7 +110,11 @@ export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function Batch
     }
   }, [])
 
-  useImperativeHandle(ref, () => ({ addServerFile }), [addServerFile])
+  const removeServerFile = useCallback((filename: string) => {
+    setBatches(prev => prev.filter(b => b.serverFilename !== filename))
+  }, [])
+
+  useImperativeHandle(ref, () => ({ addServerFile, removeServerFile }), [addServerFile, removeServerFile])
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()

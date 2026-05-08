@@ -39,8 +39,19 @@ export function Dashboard({ onMailDraft, batchBuilderRef }: Props) {
       return
     }
 
+    if (event.type === 'run_deleted') {
+      setActiveRuns(prev => { const n = new Map(prev); n.delete(event.run_id); return n })
+      setTransfers(prev => { const n = new Map(prev); n.delete(event.run_id); return n })
+      qc.invalidateQueries({ queryKey: ['runs'] })
+      return
+    }
+
     if (event.type === 'run_update') {
       if (event.status === 'running') {
+        // Remove the server file from all batch queues, regardless of who started the run
+        if (event.metadata_filename) {
+          batchBuilderRef?.current?.removeServerFile(event.metadata_filename)
+        }
         // Only add runs to this dashboard that were started by the current user
         if (event.initiated_by && event.initiated_by !== currentUser) return
         setActiveRuns(prev => {

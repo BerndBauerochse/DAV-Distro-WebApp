@@ -87,6 +87,7 @@ export interface RunUpdateEvent {
   skipped_files: number
   mail_draft?: MailDraft
   initiated_by?: string | null
+  metadata_filename?: string | null
 }
 
 export interface NewMetadataFileEvent {
@@ -94,7 +95,12 @@ export interface NewMetadataFileEvent {
   filename: string
 }
 
-export type WsEvent = ProgressEvent | RunUpdateEvent | NewMetadataFileEvent
+export interface RunDeletedEvent {
+  type: 'run_deleted'
+  run_id: string
+}
+
+export type WsEvent = ProgressEvent | RunUpdateEvent | NewMetadataFileEvent | RunDeletedEvent
 
 export interface FileEntry {
   name: string

@@ -129,9 +129,10 @@ export const api = {
     return request(`/runs/${runId}/cancel`, { method: 'POST' })
   },
 
-  async exportRuns(format: 'csv' | 'xlsx', portal?: string): Promise<void> {
+  async exportRuns(format: 'csv' | 'xlsx', portal?: string, initiated_by?: string): Promise<void> {
     const params = new URLSearchParams({ format })
     if (portal) params.set('portal', portal)
+    if (initiated_by) params.set('initiated_by', initiated_by)
     const { token } = getStoredAuth()
     const res = await fetch(`${BASE}/runs/export?${params}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
