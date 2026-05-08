@@ -26,6 +26,7 @@ class BookInfo:
     author: str
     abridged: bool | None   # True=Gekürzt, False=Ungekürzt, None=unbekannt
     zip_available: bool
+    cover_available: bool = field(default=False)
 
 
 @dataclass
@@ -86,17 +87,17 @@ def get_portal_variants(portal: str) -> list[dict]:
 # Haupt-Parser
 # ---------------------------------------------------------------------------
 
-def parse_metadata(file_path: str, filename: str, source_dir: str) -> BatchPreview:
+def parse_metadata(file_path: str, filename: str, source_dir: str, covers_dir: str = "") -> BatchPreview:
     portal = detect_portal(filename)
     lower = filename.lower()
 
     if lower.endswith(".xml"):
-        books = _parse_onix_xml(file_path, source_dir)
+        books = _parse_onix_xml(file_path, source_dir, covers_dir)
     elif lower.endswith(".xlsx") or lower.endswith(".xls"):
         if portal == "zebra":
-            books = _parse_zebra_excel(file_path, source_dir)
+            books = _parse_zebra_excel(file_path, source_dir, covers_dir)
         else:
-            books = _parse_audible_excel(file_path, source_dir)
+            books = _parse_audible_excel(file_path, source_dir, covers_dir)
     else:
         books = []
 
@@ -112,7 +113,7 @@ def parse_metadata(file_path: str, filename: str, source_dir: str) -> BatchPrevi
 # ONIX 3 XML
 # ---------------------------------------------------------------------------
 
-def _parse_onix_xml(file_path: str, source_dir: str) -> list[BookInfo]:
+def _parse_onix_xml(file_path: str, source_dir: str, covers_dir: str = "") -> list[BookInfo]:
     import xml.etree.ElementTree as ET
     ns = {"ns": "http://ns.editeur.org/onix/3.0/reference"}
     books: list[BookInfo] = []
@@ -145,10 +146,11 @@ def _parse_onix_xml(file_path: str, source_dir: str) -> list[BookInfo]:
             abridged = _FORM_DETAIL_MAP.get(fd_el.text.strip(), None) if fd_el is not None and fd_el.text else None
 
             zip_available = os.path.isfile(os.path.join(source_dir, f"{ean}.zip"))
+            cover_available = bool(covers_dir and os.path.isfile(os.path.join(covers_dir, f"{ean}.jpg")))
 
             books.append(BookInfo(
                 ean=ean, title=title, author=author,
-                abridged=abridged, zip_available=zip_available,
+                abridged=abridged, zip_available=zip_available, cover_available=cover_available,
             ))
 
     except Exception as e:
@@ -183,7 +185,7 @@ _AUDIBLE_LNAME_COL = "Author Last Name"
 _AUDIBLE_ABRIDGED_COL = "Abridged /  Unabridged"   # note double-space
 
 
-def _parse_audible_excel(file_path: str, source_dir: str) -> list[BookInfo]:
+def _parse_audible_excel(file_path: str, source_dir: str, covers_dir: str = "") -> list[BookInfo]:
     import pandas as pd
     books: list[BookInfo] = []
     try:
@@ -204,9 +206,10 @@ def _parse_audible_excel(file_path: str, source_dir: str) -> list[BookInfo]:
             else:
                 abridged = None
             zip_available = os.path.isfile(os.path.join(source_dir, f"{ean}.zip"))
+            cover_available = bool(covers_dir and os.path.isfile(os.path.join(covers_dir, f"{ean}.jpg")))
             books.append(BookInfo(
                 ean=ean, title=title, author=author,
-                abridged=abridged, zip_available=zip_available,
+                abridged=abridged, zip_available=zip_available, cover_available=cover_available,
             ))
     except Exception as e:
         logger.error(f"Audible Excel parse error: {e}")
@@ -217,7 +220,7 @@ def _parse_audible_excel(file_path: str, source_dir: str) -> list[BookInfo]:
 # Zebra Excel
 # ---------------------------------------------------------------------------
 
-def _parse_zebra_excel(file_path: str, source_dir: str) -> list[BookInfo]:
+def _parse_zebra_excel(file_path: str, source_dir: str, covers_dir: str = "") -> list[BookInfo]:
     import pandas as pd
     books: list[BookInfo] = []
     try:
@@ -240,9 +243,10 @@ def _parse_zebra_excel(file_path: str, source_dir: str) -> list[BookInfo]:
             else:
                 abridged = None
             zip_available = os.path.isfile(os.path.join(source_dir, f"{ean}.zip"))
+            cover_available = bool(covers_dir and os.path.isfile(os.path.join(covers_dir, f"{ean}.jpg")))
             books.append(BookInfo(
                 ean=ean, title=title, author=author,
-                abridged=abridged, zip_available=zip_available,
+                abridged=abridged, zip_available=zip_available, cover_available=cover_available,
             ))
     except Exception as e:
         logger.error(f"Zebra Excel parse error: {e}")

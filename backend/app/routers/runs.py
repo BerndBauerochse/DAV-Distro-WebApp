@@ -151,6 +151,7 @@ async def preview_metadata(
 
     storage_root = os.getenv("STORAGE_DIR", "/storage")
     source_dir = os.path.join(storage_root, "zips")
+    covers_dir = os.path.join(storage_root, "covers")
 
     temp_path = None
     filename = ""
@@ -174,7 +175,7 @@ async def preview_metadata(
         raise HTTPException(status_code=422, detail="Keine Metadatei angegeben")
 
     try:
-        result = parse_metadata(temp_path, filename, source_dir)
+        result = parse_metadata(temp_path, filename, source_dir, covers_dir)
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
     finally:
@@ -195,6 +196,7 @@ async def preview_metadata(
                 "author": b.author,
                 "abridged": b.abridged,
                 "zip_available": b.zip_available,
+                "cover_available": b.cover_available,
             }
             for b in result.books
         ],

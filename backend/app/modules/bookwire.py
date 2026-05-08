@@ -235,3 +235,12 @@ class BookwireMoAModule(BookwireModule):
             ))
 
         return transfers
+
+    def check_missing(self, metadata_path: str | None) -> list[str]:
+        if not metadata_path or not os.path.isfile(metadata_path):
+            return []
+        try:
+            eans = self._extract_eans(metadata_path)
+        except Exception:
+            return []
+        return [e for e in eans if not os.path.isfile(os.path.join(self.covers_dir, f"{e}.jpg"))]

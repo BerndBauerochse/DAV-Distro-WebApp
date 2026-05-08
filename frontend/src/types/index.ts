@@ -54,6 +54,7 @@ export interface BookInfo {
   author: string
   abridged: boolean | null   // true=Gekürzt, false=Ungekürzt, null=unbekannt
   zip_available: boolean
+  cover_available: boolean
 }
 
 export interface PortalVariant {

@@ -44,10 +44,12 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   )
   const [takedown, setTakedown] = useState(false)
 
-  const missingCount = preview.books.filter(b => !b.zip_available).length
+  const isMoA        = selectedPortal.endsWith('_moa')
+  const missingCount = preview.books.filter(b => isMoA ? !b.cover_available : !b.zip_available).length
   const totalCount   = preview.books.length
   const colors       = PORTAL_COLORS[selectedPortal] ?? PORTAL_COLORS.unknown
   const selectedLabel = preview.portal_variants.find(v => v.key === selectedPortal)?.label ?? 'Standard'
+  const fileLabel    = isMoA ? 'Cover' : 'ZIP'
 
   return (
     <div className="glass-card overflow-hidden">
@@ -82,7 +84,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
         <div className="flex items-center gap-2 shrink-0">
           {missingCount > 0 && (
             <span className="text-xs font-medium" style={{ color: '#f87171' }}>
-              {missingCount} ZIP fehlt{missingCount > 1 ? 'en' : ''}
+              {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
             </span>
           )}
           {/* Takedown toggle */}
@@ -130,7 +132,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
             style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <span>Titel / Autor</span>
             <span className="text-center w-24">Art</span>
-            <span className="text-center w-6">ZIP</span>
+            <span className="text-center w-6">{fileLabel}</span>
           </div>
 
           <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
@@ -149,7 +151,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
                   <AbridgedBadge abridged={book.abridged} />
                 </div>
                 <div className="w-6 flex justify-center">
-                  {book.zip_available
+                  {(isMoA ? book.cover_available : book.zip_available)
                     ? <CheckCircle2 className="w-4 h-4" style={{ color: '#4ade80' }} />
                     : <XCircle      className="w-4 h-4" style={{ color: '#f87171' }} />
                   }
@@ -167,11 +169,11 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
           {totalCount} {totalCount === 1 ? 'Titel' : 'Titel'}
         </span>
         {missingCount === 0 && totalCount > 0 && (
-          <span className="text-xs font-medium" style={{ color: '#4ade80' }}>✓ Alle ZIPs vorhanden</span>
+          <span className="text-xs font-medium" style={{ color: '#4ade80' }}>✓ Alle {fileLabel}s vorhanden</span>
         )}
         {missingCount > 0 && (
           <span className="text-xs font-medium" style={{ color: '#f87171' }}>
-            {totalCount - missingCount} / {totalCount} ZIPs vorhanden
+            {totalCount - missingCount} / {totalCount} {fileLabel}s vorhanden
           </span>
         )}
       </div>
