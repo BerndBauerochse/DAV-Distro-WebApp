@@ -1,13 +1,13 @@
+import asyncio
+import json
 import logging
-
-import httpx
+import urllib.request
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import AsyncSessionLocal, get_db
-from app.models import TitleCatalog
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +16,13 @@ WEBHOOK_URL = "https://n8n.der-audio-verlag.de/webhook/49dd3f5e-dc77-496e-a099-0
 router = APIRouter()
 
 
+def _fetch_catalog_sync() -> list:
+    with urllib.request.urlopen(WEBHOOK_URL, timeout=30) as resp:
+        return json.loads(resp.read()).get("data", [])
+
+
 async def fetch_and_store_catalog() -> int:
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(WEBHOOK_URL)
-        resp.raise_for_status()
-        items = resp.json().get("data", [])
+    items = await asyncio.to_thread(_fetch_catalog_sync)
 
     async with AsyncSessionLocal() as db:
         for item in items:
