@@ -35,10 +35,14 @@ async def _catalog_sync_loop():
     """Syncs the title catalog from n8n once per day, starting immediately."""
     while True:
         try:
-            await fetch_and_store_catalog()
+            count = await fetch_and_store_catalog()
+            logger.info("Titelkatalog-Sync OK: %d Einträge", count)
         except Exception as e:
             logger.error("Titelkatalog-Sync fehlgeschlagen: %s", e)
         await asyncio.sleep(24 * 3600)
+
+
+_background_tasks: set = set()
 
 
 @asynccontextmanager
@@ -47,7 +51,10 @@ async def lifespan(app: FastAPI):
     logger.info("Database initialized")
     storage_root = Path(os.getenv("STORAGE_DIR", "/storage"))
     start_file_watcher(storage_root)
-    asyncio.create_task(_catalog_sync_loop())
+    # Referenz halten, damit GC den Task nicht vorzeitig verwirft
+    task = asyncio.create_task(_catalog_sync_loop())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     yield
 
 
