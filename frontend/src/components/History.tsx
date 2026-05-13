@@ -8,11 +8,16 @@ import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { StatusBadge } from './StatusBadge'
 import { api } from '../api/client'
-import type { DeliveryRun, DeliveryLog } from '../types'
+import type { CatalogMap, DeliveryRun, DeliveryLog } from '../types'
 
 const PAGE_SIZE = 20
 
 export function History() {
+  const { data: catalog = {} } = useQuery({
+    queryKey: ['catalog'],
+    queryFn: api.getCatalog,
+    staleTime: 60 * 60 * 1000,
+  })
   const [portalFilter, setPortalFilter] = useState('')
   const [search, setSearch] = useState('')
   const [expandedRun, setExpandedRun] = useState<string | null>(null)
@@ -128,6 +133,7 @@ export function History() {
                 <RunRow
                   key={run.id}
                   run={run}
+                  catalog={catalog}
                   portalName={portalNames[run.portal] ?? run.portal.toUpperCase()}
                   expanded={expandedRun === run.id}
                   onToggle={() => setExpandedRun(expandedRun === run.id ? null : run.id)}
@@ -158,12 +164,12 @@ export function History() {
 }
 
 interface RunRowProps {
-  run: DeliveryRun; portalName: string; expanded: boolean
+  run: DeliveryRun; portalName: string; catalog: CatalogMap; expanded: boolean
   onToggle: () => void; onDelete: () => void; onCancel: () => void
   isDeleting: boolean; isCancelling: boolean
 }
 
-function RunRow({ run, portalName, expanded, onToggle, onDelete, onCancel, isDeleting, isCancelling }: RunRowProps) {
+function RunRow({ run, portalName, catalog, expanded, onToggle, onDelete, onCancel, isDeleting, isCancelling }: RunRowProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: logs } = useQuery({
@@ -258,7 +264,7 @@ function RunRow({ run, portalName, expanded, onToggle, onDelete, onCancel, isDel
       {expanded && logs && (
         <tr>
           <td colSpan={9} className="p-0" style={{ background: 'rgba(0,0,0,0.2)' }}>
-            <LogTable logs={logs} />
+            <LogTable logs={logs} catalog={catalog} />
           </td>
         </tr>
       )}
@@ -266,7 +272,7 @@ function RunRow({ run, portalName, expanded, onToggle, onDelete, onCancel, isDel
   )
 }
 
-function LogTable({ logs }: { logs: DeliveryLog[] }) {
+function LogTable({ logs, catalog }: { logs: DeliveryLog[]; catalog: CatalogMap }) {
   const visible = logs.filter(l => l.status !== 'pending' && l.status !== 'uploading')
   const eans = [...new Set(logs.map(l => l.ean).filter(Boolean) as string[])]
 
@@ -278,12 +284,20 @@ function LogTable({ logs }: { logs: DeliveryLog[] }) {
     <div className="px-8 py-3 overflow-x-auto">
       {eans.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-1.5">
-          {eans.map(ean => (
-            <span key={ean} className="inline-block text-xs font-mono px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }}>
-              {ean}
-            </span>
-          ))}
+          {eans.map(ean => {
+            const book = catalog[ean]
+            return (
+              <span key={ean} className="inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(34,211,238,0.1)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }}>
+                <span className="font-mono">{ean}</span>
+                {book && (
+                  <span style={{ color: 'rgba(255,255,255,0.65)', fontFamily: 'inherit' }}>
+                    {book.titel}
+                  </span>
+                )}
+              </span>
+            )
+          })}
         </div>
       )}
 
@@ -303,7 +317,14 @@ function LogTable({ logs }: { logs: DeliveryLog[] }) {
               <tr key={log.id}
                 style={{ borderBottom: '1px solid rgba(255,255,255,0.03)',
                   background: log.status === 'failed' ? 'rgba(248,113,113,0.05)' : undefined }}>
-                <td className="py-2 pr-4 font-mono" style={{ color: 'var(--text-secondary)' }}>{log.ean ?? '—'}</td>
+                <td className="py-2 pr-4">
+                  <span className="font-mono" style={{ color: 'var(--text-secondary)' }}>{log.ean ?? '—'}</span>
+                  {log.ean && catalog[log.ean] && (
+                    <p className="text-xs truncate max-w-[12rem]" style={{ color: '#a78bfa' }}>
+                      {catalog[log.ean].titel}
+                    </p>
+                  )}
+                </td>
                 <td className="py-2 pr-4 max-w-xs">
                   <div className="flex items-center gap-1">
                     {log.file_type === 'metadata'   ? <FileText       className="w-3 h-3 shrink-0" style={{ color: '#a78bfa' }} />

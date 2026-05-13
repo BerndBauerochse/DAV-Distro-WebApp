@@ -32,6 +32,12 @@ async def init_db():
             "CREATE TABLE IF NOT EXISTS user_settings "
             "(username TEXT PRIMARY KEY, avatar_data TEXT)"
         ))
+        # Migration: title_catalog table (EAN → Titel/Autor)
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS title_catalog "
+            "(ean TEXT PRIMARY KEY, titel TEXT NOT NULL, autor TEXT NOT NULL, "
+            "synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+        ))
 
 
 async def get_db():

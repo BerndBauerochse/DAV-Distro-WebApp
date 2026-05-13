@@ -1,4 +1,4 @@
-import type { DeliveryRun, DeliveryLog, Portal, FileEntry, FileCategory, BatchPreview } from '../types'
+import type { DeliveryRun, DeliveryLog, Portal, FileEntry, FileCategory, BatchPreview, CatalogMap } from '../types'
 import { getStoredAuth } from '../hooks/useAuth'
 
 const BASE = '/api'
@@ -123,6 +123,14 @@ export const api = {
 
   deleteRun(runId: string): Promise<void> {
     return request(`/runs/${runId}`, { method: 'DELETE' })
+  },
+
+  getCatalog(): Promise<CatalogMap> {
+    return request('/catalog')
+  },
+
+  syncCatalog(): Promise<{ synced: number }> {
+    return request('/catalog/sync', { method: 'POST' })
   },
 
   cancelRun(runId: string): Promise<void> {

@@ -4,7 +4,7 @@ import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database,
 import { api } from '../api/client'
 import { useUpload } from '../contexts/UploadContext'
 import { getStoredAuth } from '../hooks/useAuth'
-import type { FileCategory, FileEntry } from '../types'
+import type { CatalogMap, FileCategory, FileEntry } from '../types'
 
 const CATEGORIES: { key: FileCategory; label: string; icon: React.ReactNode; accept: string; desc: string }[] = [
   { key: 'zips',     label: 'ZIPs',      icon: <FileArchive className="w-4 h-4" />, accept: '.zip',             desc: 'Audiobook-Master-ZIPs' },
@@ -68,13 +68,13 @@ function AuthImage({ filename, alt, className }: { filename: string; alt: string
   )
 }
 
-function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGORIES[number]; onUseForDelivery?: (filename: string) => void }) {
+function CategoryPanel({ category, catalog, onUseForDelivery }: { category: typeof CATEGORIES[number]; catalog: CatalogMap; onUseForDelivery?: (filename: string) => void }) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [coverSort, setCoverSort] = useState<'newest' | 'oldest' | 'ean_asc' | 'ean_desc'>('newest')
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'ean_asc' | 'ean_desc'>('newest')
   const { uploads, startUpload } = useUpload()
 
   const { data: files = [], isLoading, isError } = useQuery({
@@ -141,15 +141,31 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
   const isCovers = category.key === 'covers'
   const allSelected = files.length > 0 && selected.size === files.length
 
-  const sortedFiles: FileEntry[] = isCovers
-    ? [...files].sort((a, b) => {
-        if (coverSort === 'newest') return b.modified - a.modified
-        if (coverSort === 'oldest') return a.modified - b.modified
-        const ea = extractEan(a.name) ?? a.name
-        const eb = extractEan(b.name) ?? b.name
-        return coverSort === 'ean_asc' ? ea.localeCompare(eb) : eb.localeCompare(ea)
-      })
-    : files
+  const sortedFiles: FileEntry[] = [...files].sort((a, b) => {
+    if (sortOrder === 'newest') return b.modified - a.modified
+    if (sortOrder === 'oldest') return a.modified - b.modified
+    const ea = extractEan(a.name) ?? a.name
+    const eb = extractEan(b.name) ?? b.name
+    return sortOrder === 'ean_asc' ? ea.localeCompare(eb) : eb.localeCompare(ea)
+  })
+
+  const sortControls = (
+    <div className="flex items-center gap-1">
+      {(['newest', 'oldest', 'ean_asc', 'ean_desc'] as const).map((key) => {
+        const label = key === 'newest' ? 'Neu' : key === 'oldest' ? 'Alt' : key === 'ean_asc' ? 'EAN ↑' : 'EAN ↓'
+        return (
+          <button key={key} onClick={() => setSortOrder(key)}
+            className="text-xs px-2 py-1 rounded-lg transition-colors"
+            style={sortOrder === key
+              ? { background: 'rgba(109,40,217,0.3)', color: '#a78bfa', border: '1px solid rgba(109,40,217,0.4)' }
+              : { color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.06)' }
+            }>
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
 
   return (
     <div className="space-y-4">
@@ -256,20 +272,7 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
               {allSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
             </button>
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Alle auswählen</span>
-
-            {/* Sort controls */}
-            <div className="ml-auto flex items-center gap-1">
-              {([ ['newest', 'Neu'], ['oldest', 'Alt'], ['ean_asc', 'EAN ↑'], ['ean_desc', 'EAN ↓'] ] as const).map(([key, label]) => (
-                <button key={key} onClick={() => setCoverSort(key)}
-                  className="text-xs px-2 py-1 rounded-lg transition-colors"
-                  style={coverSort === key
-                    ? { background: 'rgba(109,40,217,0.3)', color: '#a78bfa', border: '1px solid rgba(109,40,217,0.4)' }
-                    : { color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.06)' }
-                  }>
-                  {label}
-                </button>
-              ))}
-            </div>
+            <div className="ml-auto">{sortControls}</div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {sortedFiles.map((f: FileEntry) => (
@@ -324,16 +327,17 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
         </div>
       )}
 
-      {/* List view */}
+      {/* List / Grid view for non-cover categories */}
       {!isCovers && files.length > 0 && (
         <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--glass-border)' }}>
-          <div className="flex items-center gap-3 px-4 py-2" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--glass-border)' }}>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2" style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--glass-border)' }}>
             <button onClick={toggleAll} style={{ color: allSelected ? '#22d3ee' : 'var(--text-muted)' }}>
               {allSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
             </button>
             <span className="section-label">Alle auswählen</span>
+            <div className="ml-auto">{sortControls}</div>
           </div>
-          {files.map((f: FileEntry) => {
+          {sortedFiles.map((f: FileEntry) => {
             const ean = extractEan(f.name)
             const hasCover = ean !== null && coverEans.has(ean)
             const coverFilename = hasCover ? `${ean}.jpg` : null
@@ -355,9 +359,20 @@ function CategoryPanel({ category, onUseForDelivery }: { category: typeof CATEGO
               }
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white/80 truncate">{f.name}</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {fmtBytes(f.size)} · {fmtDate(f.modified)}
-                </p>
+                {ean && catalog[ean]
+                  ? <p className="text-xs truncate" style={{ color: '#a78bfa' }}>
+                      {catalog[ean].titel}
+                      {catalog[ean].autor && <span style={{ color: 'var(--text-muted)' }}> · {catalog[ean].autor}</span>}
+                    </p>
+                  : <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {fmtBytes(f.size)} · {fmtDate(f.modified)}
+                    </p>
+                }
+                {ean && catalog[ean] && (
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {fmtBytes(f.size)} · {fmtDate(f.modified)}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {category.key === 'metadata' && onUseForDelivery && (
@@ -419,6 +434,12 @@ export function FileManager({ onUseForDelivery, activeTab = 'zips', onTabChange 
   const setActiveTab = (tab: FileCategory) => onTabChange ? onTabChange(tab) : undefined
   const active = CATEGORIES.find(c => c.key === activeTab)!
 
+  const { data: catalog = {} } = useQuery({
+    queryKey: ['catalog'],
+    queryFn: api.getCatalog,
+    staleTime: 60 * 60 * 1000, // 1h — passt zum täglichen Sync
+  })
+
   return (
     <div className="space-y-5">
       {/* Tab bar */}
@@ -442,7 +463,7 @@ export function FileManager({ onUseForDelivery, activeTab = 'zips', onTabChange 
       {/* Panel */}
       <div className="glass-card p-6">
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{active.desc}</p>
-        <CategoryPanel category={active} onUseForDelivery={onUseForDelivery} />
+        <CategoryPanel category={active} catalog={catalog} onUseForDelivery={onUseForDelivery} />
       </div>
     </div>
   )

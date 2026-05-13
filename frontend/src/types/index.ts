@@ -111,6 +111,13 @@ export interface FileEntry {
 
 export type FileCategory = 'zips' | 'toc' | 'pdf' | 'covers' | 'metadata'
 
+export interface CatalogEntry {
+  titel: string
+  autor: string
+}
+
+export type CatalogMap = Record<string, CatalogEntry>
+
 export interface ActiveTransfer {
   run_id: string
   portal: string

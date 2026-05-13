@@ -65,5 +65,15 @@ class UserSettings(Base):
     __tablename__ = "user_settings"
 
     username: Mapped[str] = mapped_column(String, primary_key=True)
-    # base64 data-URL of the user's avatar image, stored as text
     avatar_data: Mapped[str | None] = mapped_column(Text)
+
+
+class TitleCatalog(Base):
+    __tablename__ = "title_catalog"
+
+    ean: Mapped[str] = mapped_column(String, primary_key=True)
+    titel: Mapped[str] = mapped_column(String, nullable=False)
+    autor: Mapped[str] = mapped_column(String, nullable=False)
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
