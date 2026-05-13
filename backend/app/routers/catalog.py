@@ -38,8 +38,8 @@ async def fetch_and_store_catalog() -> int:
                 ),
                 {
                     "ean": ean,
-                    "titel": item.get("Titel", ""),
-                    "autor": item.get("Autor", ""),
+                    "titel": item.get("Titel") or "",
+                    "autor": item.get("Autor") or "",
                 },
             )
         await db.commit()
