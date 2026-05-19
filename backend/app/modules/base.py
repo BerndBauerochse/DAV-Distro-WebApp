@@ -3,10 +3,15 @@ Base class for all portal delivery modules.
 Each module must implement get_files() and ship().
 Progress is reported via the progress_callback.
 """
+import logging
+import os
+import zipfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable
 import configparser
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,6 +71,17 @@ class BasePortalModule(ABC):
         Override in modules that generate notification emails.
         Returns dict with keys: to, subject, body"""
         return None
+
+    def _inject_pdf_into_zip(self, zip_path: str, ean: str, pdf_dir: str) -> bool:
+        """Hängt eine PDF als {ean}_booklet.pdf an das ZIP an, falls vorhanden.
+        Gibt True zurück wenn eine PDF eingefügt wurde, sonst False."""
+        pdf_src = os.path.join(pdf_dir, f"{ean}.pdf")
+        if not os.path.isfile(pdf_src):
+            return False
+        with zipfile.ZipFile(zip_path, "a", zipfile.ZIP_DEFLATED) as zf:
+            zf.write(pdf_src, arcname=f"{ean}_booklet.pdf")
+        logger.info("PDF für %s in ZIP eingefügt: %s_booklet.pdf", ean, ean)
+        return True
 
     def _get(self, section: str, key: str, fallback: str = "") -> str:
         return self.config.get(section, key, fallback=fallback)

@@ -26,6 +26,7 @@ class GoogleModule(BasePortalModule):
         super().__init__(config, portal_name)
         sec = "Portal_Google"
         self.source_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "zips")
+        self.pdf_dir    = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
         # ZIP SFTP
         self.zip_host = self._get(sec, "zip_sftp_host", "partnerupload.google.com")
         self.zip_port = config.getint(sec, "zip_sftp_port", fallback=19321)
@@ -133,6 +134,8 @@ class GoogleModule(BasePortalModule):
 
             # Clean up extracted folder
             shutil.rmtree(extract_dir, ignore_errors=True)
+            # PDF einfügen falls vorhanden
+            self._inject_pdf_into_zip(out_zip, ean, self.pdf_dir)
             logger.info(f"Google: ZIP vorbereitet für {ean} ({total} MP3s)")
             return out_zip
 

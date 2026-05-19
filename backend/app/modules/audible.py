@@ -118,6 +118,7 @@ class AudibleModule(BasePortalModule):
         self.export_dir = self._get(sec, "export_dir", "/data/export/audible")
         self.source_dir = self._get(sec, "source_dir", "/data/source")
         self.toc_folder = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "toc")
+        self.pdf_dir    = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
         self.host = self._get(sec, "host", "dar-eu.amazon-digital-ftp.com")
         self.port = config.getint(sec, "port", fallback=22)
         self.username = self._get(sec, "username", "deftp_dave")
@@ -164,6 +165,7 @@ class AudibleModule(BasePortalModule):
             shutil.copy2(zip_src, zip_dest)
 
             injected = self._inject_toc(zip_dest, ean)
+            pdf_injected = self._inject_pdf_into_zip(zip_dest, ean, self.pdf_dir)
 
             transfers.append(FileTransfer(
                 ean=ean,
@@ -172,7 +174,10 @@ class AudibleModule(BasePortalModule):
                 source_path=zip_dest,
                 destination=f"{self.remote_path}{os.path.basename(zip_dest)}",
                 file_size_bytes=os.path.getsize(zip_dest),
-                injected_files=[(name, "toc") for name in injected],
+                injected_files=(
+                    [(name, "toc") for name in injected] +
+                    ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [])
+                ),
             ))
 
         # Mail-Entwurf vorbereiten
@@ -469,6 +474,7 @@ class AudibleFulfillModule(AudibleModule):
         self.export_dir = self._get(sec, "export_dir", "/data/export/audible")
         self.source_dir = self._get(sec, "source_dir", "/data/source")
         self.toc_folder = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "toc")
+        self.pdf_dir    = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
         self.host = self._get(sec, "host", "dar-eu.amazon-digital-ftp.com")
         self.port = config.getint(sec, "port", fallback=22)
         self.username = self._get(sec, "username", "deftp_dave")

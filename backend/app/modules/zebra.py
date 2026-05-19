@@ -40,6 +40,7 @@ class ZebraModule(BasePortalModule):
         sec = "Portal_Zebra"
         self.export_dir = self._get(sec, "export_dir", "/data/export/zebra")
         self.source_dir = self._get(sec, "source_dir", "/data/source")
+        self.pdf_dir    = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
         self.host = self._get(sec, "sftp_host", "ftp.media-ems.com")
         self.port = config.getint(sec, "sftp_port", fallback=2201)
         self.username = self._get(sec, "sftp_username", "DAV")
@@ -111,6 +112,11 @@ class ZebraModule(BasePortalModule):
                     zf.extractall(self.export_dir)
                 self._extracted_count += 1
                 logger.info(f"Zebra: Entpackt {ean}.zip → {self.export_dir}")
+                # PDF einfügen falls vorhanden
+                pdf_src = os.path.join(self.pdf_dir, f"{ean}.pdf")
+                if os.path.isfile(pdf_src):
+                    shutil.copy2(pdf_src, os.path.join(self.export_dir, f"{ean}_booklet.pdf"))
+                    logger.info(f"Zebra: PDF für {ean} in Export-Verzeichnis kopiert")
             except Exception as e:
                 logger.error(f"Zebra: Fehler beim Entpacken von {ean}.zip: {e}")
 

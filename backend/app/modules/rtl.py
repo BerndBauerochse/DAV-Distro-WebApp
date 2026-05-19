@@ -3,6 +3,7 @@ import base64
 import glob
 import logging
 import os
+import shutil
 
 from app.modules.base import BasePortalModule, FileTransfer, ProgressCallback
 from app.modules.ftp_helper import sftp_connection, sftp_upload, sftp_makedirs
@@ -18,6 +19,8 @@ class RTLModule(BasePortalModule):
         super().__init__(config, portal_name)
         sec = "Portal_RTL+"
         self.source_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "zips")
+        self.export_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "export", "rtl")
+        self.pdf_dir    = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
         self.host = self._get(sec, "sftp_host", "ftp-audiobooks.now-plus-prod.aws-cbc.cloud")
         self.port = config.getint(sec, "sftp_port", fallback=22)
         self.username = self._get(sec, "sftp_username", "dav")
@@ -60,13 +63,26 @@ class RTLModule(BasePortalModule):
             if not os.path.isfile(src):
                 logger.warning(f"RTL+: ZIP nicht gefunden: {src}")
                 continue
+            # PDF-Injection: wenn PDF vorhanden, ZIP in Export-Dir kopieren und PDF anhängen
+            pdf_path = os.path.join(self.pdf_dir, f"{ean}.pdf")
+            if os.path.isfile(pdf_path):
+                os.makedirs(self.export_dir, exist_ok=True)
+                dest = os.path.join(self.export_dir, f"{ean}.zip")
+                shutil.copy2(src, dest)
+                self._inject_pdf_into_zip(dest, ean, self.pdf_dir)
+                source_path = dest
+                injected = [(f"{ean}_booklet.pdf", "pdf")]
+            else:
+                source_path = src
+                injected = []
             transfers.append(FileTransfer(
                 ean=ean,
                 file_name=f"{ean}.zip",
                 file_type="zip",
-                source_path=src,
+                source_path=source_path,
                 destination=self._remote_path(f"{ean}.zip"),
-                file_size_bytes=os.path.getsize(src),
+                file_size_bytes=os.path.getsize(source_path),
+                injected_files=injected,
             ))
 
         return transfers

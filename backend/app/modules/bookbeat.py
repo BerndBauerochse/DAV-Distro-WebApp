@@ -21,6 +21,7 @@ class BookbeatModule(BasePortalModule):
         sec = "Portal_Bookbeat"
         self.export_dir = self._get(sec, "export_dir", "/data/export/bookbeat")
         self.source_dir = self._get(sec, "source_dir", "/data/source")
+        self.pdf_dir    = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
         self.host = self._get(sec, "sftp_host", "sftp-upload.bookbeat.com")
         self.port = config.getint(sec, "sftp_port", fallback=22)
         self.username = self._get(sec, "sftp_username", "prodbbsftp.deraudioverlag")
@@ -57,10 +58,12 @@ class BookbeatModule(BasePortalModule):
             dest = os.path.join(self.export_dir, f"{ean}.zip")
             if src != dest:
                 shutil.copy2(src, dest)
+            pdf_injected = self._inject_pdf_into_zip(dest, ean, self.pdf_dir)
             transfers.append(FileTransfer(
                 ean=ean, file_name=f"{ean}.zip", file_type="zip",
                 source_path=dest, destination=f"/{ean}.zip",
                 file_size_bytes=os.path.getsize(dest),
+                injected_files=[(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [],
             ))
 
         return transfers
