@@ -464,6 +464,111 @@ class AudibleMoAModule(BasePortalModule):
             return None
 
 
+@register_portal("audible_corr")
+class AudibleCorrModule(AudibleModule):
+    """
+    Audible Correction — legt jede ZIP in einen eigenen Ordner '{EAN}_corr'.
+    Bei reiner Metadaten-/Cover-Lieferung (keine ZIPs) kommt die Datei
+    ebenfalls in den jeweiligen '{EAN}_corr'-Ordner.
+    """
+
+    def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
+        os.makedirs(self.export_dir, exist_ok=True)
+        transfers: list[FileTransfer] = []
+
+        # Excel finden
+        if metadata_path and os.path.isfile(metadata_path):
+            meta_file = metadata_path
+        else:
+            xlsx_files = glob.glob(os.path.join(self.export_dir, "*.xlsx"))
+            meta_file = xlsx_files[0] if xlsx_files else None
+
+        if not meta_file:
+            logger.error("Audible Corr: Keine Excel-Datei gefunden.")
+            return transfers
+
+        eans = self._extract_eans_from_excel(meta_file)
+        logger.info(f"Audible Corr: {len(eans)} EANs in Excel gefunden")
+
+        date_suffix = datetime.now().strftime("_%Y%m%d")
+
+        # Prüfen ob ZIPs vorhanden sind
+        eans_with_zip = [e for e in eans if os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
+
+        if not eans_with_zip:
+            # Nur Metadaten → Excel in jeden {EAN}_corr-Ordner
+            for ean in eans:
+                transfers.append(FileTransfer(
+                    ean=ean,
+                    file_name=os.path.basename(meta_file),
+                    file_type="metadata",
+                    source_path=meta_file,
+                    destination=f"/{ean}_corr/{os.path.basename(meta_file)}",
+                    file_size_bytes=os.path.getsize(meta_file),
+                ))
+        else:
+            # ZIPs vorhanden: Excel in Root, ZIPs je EAN in {EAN}_corr
+            transfers.append(FileTransfer(
+                ean=None,
+                file_name=os.path.basename(meta_file),
+                file_type="metadata",
+                source_path=meta_file,
+                destination=f"{self.remote_path}{os.path.basename(meta_file)}",
+                file_size_bytes=os.path.getsize(meta_file),
+            ))
+
+            for ean in eans:
+                zip_src = os.path.join(self.source_dir, f"{ean}.zip")
+                if not os.path.isfile(zip_src):
+                    logger.warning(f"Audible Corr: ZIP nicht gefunden für EAN {ean}")
+                    continue
+
+                zip_dest = os.path.join(self.export_dir, f"{ean}{date_suffix}.zip")
+                shutil.copy2(zip_src, zip_dest)
+                injected = self._inject_toc(zip_dest, ean)
+                pdf_injected = self._inject_pdf_into_zip(zip_dest, ean, self.pdf_dir)
+
+                transfers.append(FileTransfer(
+                    ean=ean,
+                    file_name=os.path.basename(zip_dest),
+                    file_type="zip",
+                    source_path=zip_dest,
+                    destination=f"/{ean}_corr/{os.path.basename(zip_dest)}",
+                    file_size_bytes=os.path.getsize(zip_dest),
+                    injected_files=(
+                        [(name, "toc") for name in injected] +
+                        ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [])
+                    ),
+                ))
+
+        self._mail_draft_data = self._build_mail_data(meta_file, eans)
+        return transfers
+
+    def ship(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
+        with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
+            for t in transfers:
+                try:
+                    # Zielordner erzeugen falls noch nicht vorhanden
+                    remote_folder = os.path.dirname(t.destination)
+                    if remote_folder and remote_folder != "/":
+                        try:
+                            sftp.stat(remote_folder)
+                        except IOError:
+                            sftp.mkdir(remote_folder)
+
+                    progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
+                    sftp_upload(
+                        sftp, t.source_path, t.destination,
+                        progress_cb=lambda cur, tot: progress_cb(
+                            run_id, t.ean, t.file_name, t.file_type, cur, tot, "uploading"
+                        ),
+                    )
+                    progress_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
+                except Exception as e:
+                    logger.error(f"Audible Corr: Upload fehlgeschlagen für {t.file_name}: {e}")
+                    progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+
+
 @register_portal("audible_fulfill")
 class AudibleFulfillModule(AudibleModule):
     """Audible Preorder Fulfill — wie Standard, aber eigener Config-Abschnitt und eigene Mailvorlage."""

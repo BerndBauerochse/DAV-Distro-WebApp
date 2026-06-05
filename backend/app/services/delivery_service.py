@@ -50,6 +50,7 @@ PORTAL_DISPLAY_NAMES = {
     "audible": "Audible",
     "audible_moa": "Audible MoA",
     "audible_fulfill": "Audible Fulfill",
+    "audible_corr": "Audible Corr",
     "bookwire": "Bookwire",
     "bookwire_moa": "Bookwire MoA",
     "bookbeat": "Bookbeat",
