@@ -507,17 +507,18 @@ class AudibleCorrModule(AudibleModule):
                     file_size_bytes=os.path.getsize(meta_file),
                 ))
         else:
-            # ZIPs vorhanden: Excel in Root, ZIPs je EAN in {EAN}_corr
-            transfers.append(FileTransfer(
-                ean=None,
-                file_name=os.path.basename(meta_file),
-                file_type="metadata",
-                source_path=meta_file,
-                destination=f"{self.remote_path}{os.path.basename(meta_file)}",
-                file_size_bytes=os.path.getsize(meta_file),
-            ))
-
+            # ZIPs vorhanden: Excel + ZIP je EAN in {EAN}_corr
             for ean in eans:
+                # Excel in diesen EAN-Ordner
+                transfers.append(FileTransfer(
+                    ean=ean,
+                    file_name=os.path.basename(meta_file),
+                    file_type="metadata",
+                    source_path=meta_file,
+                    destination=f"/{ean}_corr/{os.path.basename(meta_file)}",
+                    file_size_bytes=os.path.getsize(meta_file),
+                ))
+
                 zip_src = os.path.join(self.source_dir, f"{ean}.zip")
                 if not os.path.isfile(zip_src):
                     logger.warning(f"Audible Corr: ZIP nicht gefunden für EAN {ean}")
