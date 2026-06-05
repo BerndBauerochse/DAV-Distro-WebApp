@@ -57,6 +57,7 @@ _PORTAL_VARIANTS: dict[str, list[dict]] = {
         {"key": "audible",         "label": "Standard"},
         {"key": "audible_moa",     "label": "MoA (ohne Audio)"},
         {"key": "audible_fulfill", "label": "Preorder Fulfill"},
+        {"key": "audible_corr",    "label": "Corr (Korrekturen)"},
     ],
     "bookwire": [
         {"key": "bookwire",     "label": "Standard"},

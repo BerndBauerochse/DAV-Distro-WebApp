@@ -6,6 +6,7 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
   audible:         { bg: 'rgba(251,146,60,0.15)', text: '#fb923c' },
   audible_moa:     { bg: 'rgba(251,146,60,0.15)', text: '#fb923c' },
   audible_fulfill: { bg: 'rgba(251,146,60,0.15)', text: '#fb923c' },
+  audible_corr:    { bg: 'rgba(251,146,60,0.15)', text: '#fb923c' },
   bookwire:        { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
   bookwire_moa:    { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
   bookbeat:        { bg: 'rgba(167,139,250,0.15)', text: '#a78bfa' },
