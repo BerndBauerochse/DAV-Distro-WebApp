@@ -105,6 +105,9 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
     preview.portal_variants[0]?.key ?? preview.detected_portal
   )
   const [takedown, setTakedown] = useState(false)
+  const folderInputRef = useRef<HTMLInputElement>(null)
+  const qc = useQueryClient()
+  const { startUpload } = useUpload()
 
   const isMoA        = selectedPortal.endsWith('_moa')
   const missingCount = preview.books.filter(b => isMoA ? !b.cover_available : !b.zip_available).length
@@ -112,6 +115,41 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const colors       = PORTAL_COLORS[selectedPortal] ?? PORTAL_COLORS.unknown
   const selectedLabel = preview.portal_variants.find(v => v.key === selectedPortal)?.label ?? 'Standard'
   const fileLabel    = isMoA ? 'Cover' : 'ZIP'
+  const category: FileCategory = isMoA ? 'covers' : 'zips'
+  const expectedExt = isMoA ? ['.jpg', '.jpeg', '.png'] : ['.zip']
+
+  /**
+   * User wählt einen lokalen Ordner; alle Dateien, deren Name (ohne Endung)
+   * mit einer fehlenden EAN übereinstimmt, werden hochgeladen.
+   */
+  function handleFolderPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+
+    const missingEans = new Set(
+      preview.books
+        .filter(b => isMoA ? !b.cover_available : !b.zip_available)
+        .map(b => b.ean)
+    )
+
+    let matched = 0
+    for (const file of files) {
+      const name = file.name
+      const dot = name.lastIndexOf('.')
+      const stem = dot > 0 ? name.slice(0, dot) : name
+      const ext = dot > 0 ? name.slice(dot).toLowerCase() : ''
+      if (!expectedExt.includes(ext)) continue
+      if (!missingEans.has(stem)) continue
+      matched++
+      startUpload(category, file, () => {
+        qc.invalidateQueries({ queryKey: ['files', category] })
+      })
+    }
+    if (matched === 0) {
+      alert(`Im gewählten Ordner wurden keine passenden ${fileLabel}-Dateien gefunden.`)
+    }
+  }
 
   return (
     <div className="glass-card overflow-hidden">
@@ -145,9 +183,30 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
 
         <div className="flex items-center gap-2 shrink-0">
           {missingCount > 0 && (
-            <span className="text-xs font-medium" style={{ color: '#f87171' }}>
-              {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
-            </span>
+            <>
+              <span className="text-xs font-medium" style={{ color: '#f87171' }}>
+                {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
+              </span>
+              <button
+                onClick={() => folderInputRef.current?.click()}
+                title={`Ordner wählen — fehlende ${fileLabel}s werden automatisch erkannt und hochgeladen`}
+                className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors"
+                style={{ background: 'rgba(248,113,113,0.18)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Fehlende laden
+              </button>
+              <input
+                ref={folderInputRef}
+                type="file"
+                multiple
+                /* @ts-expect-error — non-standard but supported in Chrome/Edge/Firefox */
+                webkitdirectory=""
+                directory=""
+                className="hidden"
+                onChange={handleFolderPick}
+              />
+            </>
           )}
           {/* Takedown toggle */}
           <button
