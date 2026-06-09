@@ -119,8 +119,10 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const expectedExt = isMoA ? ['.jpg', '.jpeg', '.png'] : ['.zip']
 
   /**
-   * User wählt einen lokalen Ordner; alle Dateien, deren Name (ohne Endung)
-   * mit einer fehlenden EAN übereinstimmt, werden hochgeladen.
+   * User markiert Dateien (z.B. mit Strg+A im richtigen Ordner).
+   * Hochgeladen werden ausschließlich die Dateien, deren Name (ohne Endung)
+   * exakt einer FEHLENDEN EAN aus der Auslieferungsdatei entspricht.
+   * Alle anderen markierten Dateien werden ignoriert.
    */
   function handleFolderPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -133,21 +135,26 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
         .map(b => b.ean)
     )
 
-    let matched = 0
+    const matchedEans = new Set<string>()
     for (const file of files) {
       const name = file.name
       const dot = name.lastIndexOf('.')
       const stem = dot > 0 ? name.slice(0, dot) : name
       const ext = dot > 0 ? name.slice(dot).toLowerCase() : ''
       if (!expectedExt.includes(ext)) continue
-      if (!missingEans.has(stem)) continue
-      matched++
+      if (!missingEans.has(stem)) continue   // nur fehlende EANs der Auslieferung
+      if (matchedEans.has(stem)) continue    // Duplikate überspringen
+      matchedEans.add(stem)
       startUpload(category, file, () => {
         qc.invalidateQueries({ queryKey: ['files', category] })
       })
     }
+
+    const matched = matchedEans.size
     if (matched === 0) {
-      alert(`Im gewählten Ordner wurden keine passenden ${fileLabel}-Dateien gefunden.`)
+      alert(`Keine passenden ${fileLabel}-Dateien gefunden. Erwartet werden Dateien, die nach der EAN benannt sind (z.B. 9783742441454${expectedExt[0]}).`)
+    } else if (matched < missingEans.size) {
+      alert(`${matched} von ${missingEans.size} fehlenden ${fileLabel}s werden hochgeladen. Für ${missingEans.size - matched} EAN(s) wurde keine passende Datei gefunden.`)
     }
   }
 
@@ -189,7 +196,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
               </span>
               <button
                 onClick={() => folderInputRef.current?.click()}
-                title={`Ordner wählen — fehlende ${fileLabel}s werden automatisch erkannt und hochgeladen`}
+                title={`Dateien wählen (Strg+A im Ordner) — nur fehlende ${fileLabel}s werden hochgeladen`}
                 className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors"
                 style={{ background: 'rgba(248,113,113,0.18)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}
               >
@@ -200,9 +207,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
                 ref={folderInputRef}
                 type="file"
                 multiple
-                /* @ts-expect-error — non-standard but supported in Chrome/Edge/Firefox */
-                webkitdirectory=""
-                directory=""
+                accept={expectedExt.join(',')}
                 className="hidden"
                 onChange={handleFolderPick}
               />
