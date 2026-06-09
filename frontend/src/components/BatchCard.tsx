@@ -119,11 +119,59 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const expectedExt = isMoA ? ['.jpg', '.jpeg', '.png'] : ['.zip']
 
   /**
-   * User markiert Dateien (z.B. mit Strg+A im richtigen Ordner).
-   * Hochgeladen werden ausschließlich die Dateien, deren Name (ohne Endung)
-   * exakt einer FEHLENDEN EAN aus der Auslieferungsdatei entspricht.
-   * Alle anderen markierten Dateien werden ignoriert.
+   * Moderne Variante (Chrome/Edge): User wählt EINMAL den Ordner; die App
+   * greift sich dann gezielt selbst die Dateien {EAN}.zip / {EAN}.jpg der
+   * fehlenden Titel heraus — ohne manuelles Auswählen.
    */
+  async function handlePickFolder() {
+    const missingEans = preview.books
+      .filter(b => isMoA ? !b.cover_available : !b.zip_available)
+      .map(b => b.ean)
+    if (missingEans.length === 0) return
+
+    // @ts-expect-error — File System Access API noch nicht in allen TS-libs
+    const picker = window.showDirectoryPicker
+    if (typeof picker !== 'function') {
+      // Fallback: klassische Mehrfachauswahl
+      folderInputRef.current?.click()
+      return
+    }
+
+    let dirHandle: any
+    try {
+      dirHandle = await picker({ id: 'dav-source', mode: 'read' })
+    } catch {
+      return // User hat abgebrochen
+    }
+
+    let matched = 0
+    const notFound: string[] = []
+    for (const ean of missingEans) {
+      let fileObj: File | null = null
+      for (const ext of expectedExt) {
+        try {
+          const fh = await dirHandle.getFileHandle(`${ean}${ext}`)
+          fileObj = await fh.getFile()
+          break
+        } catch {
+          // diese Endung gibt es nicht — nächste probieren
+        }
+      }
+      if (!fileObj) { notFound.push(ean); continue }
+      matched++
+      startUpload(category, fileObj, () => {
+        qc.invalidateQueries({ queryKey: ['files', category] })
+      })
+    }
+
+    if (matched === 0) {
+      alert(`Im gewählten Ordner wurde keine der fehlenden ${fileLabel}-Dateien gefunden.\nErwartet: nach EAN benannte Dateien (z.B. ${missingEans[0]}${expectedExt[0]}).`)
+    } else if (notFound.length > 0) {
+      alert(`${matched} ${fileLabel}(s) werden hochgeladen.\nNicht gefunden für EAN: ${notFound.join(', ')}`)
+    }
+  }
+
+  /** Fallback für Browser ohne File System Access API. */
   function handleFolderPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     e.target.value = ''
@@ -142,8 +190,8 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
       const stem = dot > 0 ? name.slice(0, dot) : name
       const ext = dot > 0 ? name.slice(dot).toLowerCase() : ''
       if (!expectedExt.includes(ext)) continue
-      if (!missingEans.has(stem)) continue   // nur fehlende EANs der Auslieferung
-      if (matchedEans.has(stem)) continue    // Duplikate überspringen
+      if (!missingEans.has(stem)) continue
+      if (matchedEans.has(stem)) continue
       matchedEans.add(stem)
       startUpload(category, file, () => {
         qc.invalidateQueries({ queryKey: ['files', category] })
@@ -153,8 +201,6 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
     const matched = matchedEans.size
     if (matched === 0) {
       alert(`Keine passenden ${fileLabel}-Dateien gefunden. Erwartet werden Dateien, die nach der EAN benannt sind (z.B. 9783742441454${expectedExt[0]}).`)
-    } else if (matched < missingEans.size) {
-      alert(`${matched} von ${missingEans.size} fehlenden ${fileLabel}s werden hochgeladen. Für ${missingEans.size - matched} EAN(s) wurde keine passende Datei gefunden.`)
     }
   }
 
@@ -195,8 +241,8 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
                 {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
               </span>
               <button
-                onClick={() => folderInputRef.current?.click()}
-                title={`Dateien wählen (Strg+A im Ordner) — nur fehlende ${fileLabel}s werden hochgeladen`}
+                onClick={handlePickFolder}
+                title={`Ordner wählen — die fehlenden ${fileLabel}s ({EAN}${expectedExt[0]}) werden automatisch herausgesucht und hochgeladen`}
                 className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors"
                 style={{ background: 'rgba(248,113,113,0.18)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}
               >
