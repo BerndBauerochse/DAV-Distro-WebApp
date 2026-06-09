@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { CheckCircle2, XCircle, Loader2, Play, Trash2, ChevronDown, AlertTriangle } from 'lucide-react'
-import type { BatchPreview, BookInfo } from '../types'
+import { useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, Loader2, Play, Trash2, ChevronDown, AlertTriangle, Upload } from 'lucide-react'
+import { useUpload } from '../contexts/UploadContext'
+import type { BatchPreview, BookInfo, FileCategory } from '../types'
 
 const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
   audible:         { bg: 'rgba(251,146,60,0.15)', text: '#fb923c' },
@@ -23,6 +25,65 @@ interface Props {
   onStart: (portal: string, takedown: boolean) => void
   onRemove: () => void
   isStarting: boolean
+}
+
+/**
+ * Inline-Upload-Button für fehlende ZIPs / Cover.
+ * Beim Klick öffnet sich ein Dateidialog; nach erfolgreichem Upload wird
+ * das Batch-Preview neu geladen, damit der Status auf "vorhanden" wechselt.
+ */
+function MissingFileUpload({ ean, category, accept }: {
+  ean: string
+  category: FileCategory
+  accept: string
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const qc = useQueryClient()
+  const { uploads, startUpload } = useUpload()
+  const [done, setDone] = useState(false)
+
+  const expectedName = category === 'covers' ? `${ean}.jpg` : `${ean}.zip`
+  const task = uploads.find(u => u.filename === expectedName && u.status !== 'done')
+  const busy = task && (task.status === 'uploading' || task.status === 'queued')
+
+  function pickFile() {
+    inputRef.current?.click()
+  }
+
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    // Datei wird unter dem erwarteten Namen hochgeladen, damit der Parser sie findet
+    const renamed = new File([file], expectedName, { type: file.type })
+    startUpload(category, renamed, () => {
+      setDone(true)
+      // Preview neu laden — invalidates queries für 'preview' und 'files'
+      qc.invalidateQueries({ queryKey: ['files', category] })
+    })
+  }
+
+  if (done) {
+    return <CheckCircle2 className="w-4 h-4" style={{ color: '#4ade80' }} />
+  }
+
+  return (
+    <>
+      <button
+        onClick={pickFile}
+        disabled={busy}
+        title={busy ? `${task!.progress}%` : `${category === 'covers' ? 'Cover' : 'ZIP'} hochladen`}
+        className="p-1 rounded-md transition-colors disabled:opacity-60"
+        style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}
+      >
+        {busy
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          : <Upload className="w-3.5 h-3.5" />
+        }
+      </button>
+      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={onFile} />
+    </>
+  )
 }
 
 function AbridgedBadge({ abridged }: { abridged: boolean | null }) {
@@ -154,7 +215,11 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
                 <div className="w-6 flex justify-center">
                   {(isMoA ? book.cover_available : book.zip_available)
                     ? <CheckCircle2 className="w-4 h-4" style={{ color: '#4ade80' }} />
-                    : <XCircle      className="w-4 h-4" style={{ color: '#f87171' }} />
+                    : <MissingFileUpload
+                        ean={book.ean}
+                        category={isMoA ? 'covers' : 'zips'}
+                        accept={isMoA ? '.jpg,.jpeg,.png' : '.zip'}
+                      />
                   }
                 </div>
               </div>

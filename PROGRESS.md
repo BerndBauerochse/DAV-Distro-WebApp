@@ -115,6 +115,147 @@
 - `coverSort` → `sortOrder` — gilt jetzt für alle Kategorien
 - `sortedFiles` sortiert immer (war vorher nur bei Covers aktiv)
 - Sort-Controls als eigene `sortControls`-Variable extrahiert und im Header aller Listenbereiche eingebunden
+- Commit: `5811436`
+
+---
+
+### Feature: Titelkatalog aus n8n-Webhook
+
+**Ziel:** Einmal täglich EAN → Titel / Autor vom n8n-Webhook laden und in der App überall dort anzeigen, wo bisher nur die EAN sichtbar war (Dateiliste, Auslieferungshistorie).
+
+**Webhook:** `https://n8n.der-audio-verlag.de/webhook/49dd3f5e-dc77-496e-a099-0115828c1161`
+Liefert JSON mit Feldern: `EAN_digital`, `Titel`, `Autor`, `Sprecher`, `Inhaltsbeschreibung`, `ET`, …
+
+#### Backend
+
+**Neue Tabelle `title_catalog`** (`backend/app/models.py`, `backend/app/database.py`)
+```sql
+CREATE TABLE title_catalog (
+  ean       TEXT PRIMARY KEY,
+  titel     TEXT NOT NULL,
+  autor     TEXT NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+Migration läuft automatisch beim App-Start via `init_db()`.
+
+**Neuer Router `backend/app/routers/catalog.py`**
+- `GET /api/catalog` — gibt `{ "EAN": { "titel": "...", "autor": "..." } }` zurück (auth required)
+- `POST /api/catalog/sync` — manueller Sync-Trigger (auth required)
+- Fetch via `urllib.request` (keine externe Abhängigkeit nötig)
+- Upsert per `ON CONFLICT (ean) DO UPDATE`
+
+**Background-Task (`backend/app/main.py`)**
+- Beim App-Start sofort ein Sync, danach alle 24 Stunden
+- Task-Referenz wird in `_background_tasks: set` gehalten um Garbage-Collection zu verhindern
+
+#### Frontend
+
+**`frontend/src/types/index.ts`**
+- Neuer Typ `CatalogEntry { titel, autor }` und `CatalogMap`
+
+**`frontend/src/api/client.ts`**
+- `api.getCatalog()` → `GET /api/catalog`
+- `api.syncCatalog()` → `POST /api/catalog/sync`
+
+**`frontend/src/components/FileManager.tsx`**
+- Katalog per `useQuery` geladen (staleTime 1h)
+- In der Dateiliste: Titel (lila) + Autor als zweite Zeile unter dem Dateinamen, wenn EAN im Katalog gefunden
+
+**`frontend/src/components/History.tsx`**
+- Katalog per `useQuery` geladen
+- EAN-Chips zeigen hinter der EAN den Titelnamen
+- In der aufgeklappten Log-Tabelle: Titel als zweite Zeile unter der EAN
+
+#### Bugfixes während Rollout
+
+| Commit | Problem | Fix |
+|--------|---------|-----|
+| `79e998f` | `httpx` nicht in `requirements.txt` → Container-Crash | `httpx` durch `urllib.request` + `asyncio.to_thread` ersetzt |
+| `b955049` | `asyncio.create_task()` ohne gespeicherte Referenz → GC verwarf den Task vor Ausführung | Referenz in `_background_tasks: set` gespeichert |
+| `ad34485` | `Autor = null` im Webhook für manche Titel → `NOT NULL`-Constraint bricht Sync ab | `item.get("Autor") or ""` statt `item.get("Autor", "")` |
+
+#### Commits
+- `5811436` — feat: Titelkatalog aus n8n-Webhook
+- `79e998f` — fix: httpx durch urllib stdlib ersetzen
+- `b955049` — fix: Task-Referenz für asyncio.create_task halten (GC-Bug)
+- `ad34485` — fix: Autor kann null sein
+
+---
+
+### Feature: PDF automatisch in ZIP einbetten
+
+**Ziel:** Wenn zu einer EAN eine PDF unter `/storage/pdf/{EAN}.pdf` liegt, wird sie beim Ausliefern automatisch als `{EAN}_booklet.pdf` in die ZIP eingebettet — für alle Portale außer Spotify.
+
+#### Umsetzung
+
+**`backend/app/modules/base.py`** — neue gemeinsame Methode:
+```python
+def _inject_pdf_into_zip(self, zip_path, ean, pdf_dir) -> bool
+```
+Öffnet die ZIP im Append-Modus und hängt die PDF an. Gibt `True` zurück wenn eine PDF eingefügt wurde.
+
+**Betroffene Module:**
+
+| Modul | Stelle der Injection |
+|-------|---------------------|
+| `audible.py` | Nach TOC-Inject (`_inject_toc`) |
+| `google.py` | Am Ende von `_prepare_zip()` nach dem Repack |
+| `rtl.py` | ZIP wird erst in Export-Dir kopiert, dann PDF angehängt |
+| `divibib.py` | Nach `shutil.copy2()` |
+| `bookbeat.py` | Nach `shutil.copy2()` |
+| `zebra.py` | PDF nach dem ZIP-Entpacken in Export-Ordner kopiert |
+| `bookwire.py` | War bereits vorhanden ✓ |
+| `spotify.py` | Nicht angefasst ✓ |
+
+- Commit: `3409cc9`
+
+---
+
+### Feature: Audible Corr — Lieferung in `{EAN}_corr`-Ordner
+
+**Ziel:** Neues Audible-Portal „Corr (Korrekturen)" das jede ZIP in einen eigenen Ordner `/{EAN}_corr/` auf dem SFTP ablegt. Metadaten-Excel kommt in denselben Ordner. Bei reiner Metadaten-Lieferung (keine ZIPs) geht die Excel ebenfalls in `/{EAN}_corr/`.
+
+#### Backend (`backend/app/modules/audible.py`)
+
+Neue Klasse `AudibleCorrModule(AudibleModule)` registriert als `audible_corr`:
+
+```
+Lieferstruktur auf dem SFTP:
+  ZIPs + Excel vorhanden:
+    /{EAN}_corr/
+      {EAN}_{datum}.zip   ← inkl. TOC + PDF falls vorhanden
+      metadata.xlsx
+  Nur Excel (keine ZIPs):
+    /{EAN}_corr/
+      metadata.xlsx       ← für jede EAN in der Datei
+```
+
+- `ship()` legt den `_corr`-Ordner per `sftp.mkdir()` an falls nicht vorhanden
+
+#### Sichtbarkeit im Frontend
+
+- `backend/app/modules/metadata_parser.py`: `audible_corr` zu `_PORTAL_VARIANTS["audible"]` hinzugefügt → erscheint als „Corr (Korrekturen)" im Dropdown
+- `backend/app/services/delivery_service.py`: `"audible_corr": "Audible Corr"` in `PORTAL_DISPLAY_NAMES`
+- `frontend/src/components/BatchCard.tsx`: Farbe für `audible_corr` ergänzt
+
+#### Commits
+- `f4855c9` — feat: Audible Corr — ZIP-Lieferung in {EAN}_corr Ordner
+- `9014d22` — fix: Excel auch in {EAN}_corr wenn ZIPs vorhanden
+- `d0381cc` — fix: Audible Corr im Portal-Dropdown sichtbar machen
+
+---
+
+## Session 2026-05-13
+
+### Feature: Sortierung in allen Dateibereichen
+
+**Ziel:** Die Sort-Controls (Neu / Alt / EAN ↑ / EAN ↓), die bisher nur im Cover-Bereich vorhanden waren, auf ZIPs, TOC, PDFs und Metadaten übertragen.
+
+**Änderungen (`frontend/src/components/FileManager.tsx`)**
+- `coverSort` → `sortOrder` — gilt jetzt für alle Kategorien
+- `sortedFiles` sortiert immer (war vorher nur bei Covers aktiv)
+- Sort-Controls als eigene `sortControls`-Variable extrahiert und im Header aller Listenbereiche eingebunden
 - Commits: `5811436`
 
 ---
