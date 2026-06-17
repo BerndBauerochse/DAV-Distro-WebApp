@@ -2,17 +2,28 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronDown, ChevronRight, Search, FileArchive, FileText, AlertCircle,
-  Settings, Image, Trash2, X, Download, FileSpreadsheet,
+  Settings, Image, Trash2, X, Download, FileSpreadsheet, Mail,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { StatusBadge } from './StatusBadge'
 import { api } from '../api/client'
-import type { CatalogMap, DeliveryRun, DeliveryLog } from '../types'
+import type { CatalogMap, DeliveryRun, DeliveryLog, MailDraft } from '../types'
 
 const PAGE_SIZE = 20
 
-export function History() {
+const PORTAL_DISPLAY: Record<string, string> = {
+  audible: 'Audible', audible_moa: 'Audible MoA', audible_fulfill: 'Audible Fulfill',
+  audible_corr: 'Audible Corr', bookwire: 'Bookwire', bookwire_moa: 'Bookwire MoA',
+  bookbeat: 'Bookbeat', spotify: 'Spotify', google: 'Google', zebra: 'Zebra',
+  rtl: 'RTL+', divibib: 'Divibib',
+}
+
+interface HistoryProps {
+  onShowMail?: (runId: string, draft: MailDraft, portalName: string) => void
+}
+
+export function History({ onShowMail }: HistoryProps) {
   const { data: catalog = {} } = useQuery({
     queryKey: ['catalog'],
     queryFn: api.getCatalog,
@@ -139,6 +150,7 @@ export function History() {
                   onToggle={() => setExpandedRun(expandedRun === run.id ? null : run.id)}
                   onDelete={() => deleteMutation.mutate(run.id)}
                   onCancel={() => cancelMutation.mutate(run.id)}
+                  onShowMail={onShowMail}
                   isDeleting={deleteMutation.isPending && deleteMutation.variables === run.id}
                   isCancelling={cancelMutation.isPending && cancelMutation.variables === run.id}
                 />
@@ -166,10 +178,11 @@ export function History() {
 interface RunRowProps {
   run: DeliveryRun; portalName: string; catalog: CatalogMap; expanded: boolean
   onToggle: () => void; onDelete: () => void; onCancel: () => void
+  onShowMail?: (runId: string, draft: MailDraft, portalName: string) => void
   isDeleting: boolean; isCancelling: boolean
 }
 
-function RunRow({ run, portalName, catalog, expanded, onToggle, onDelete, onCancel, isDeleting, isCancelling }: RunRowProps) {
+function RunRow({ run, portalName, catalog, expanded, onToggle, onDelete, onCancel, onShowMail, isDeleting, isCancelling }: RunRowProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const { data: logs } = useQuery({
@@ -224,6 +237,17 @@ function RunRow({ run, portalName, catalog, expanded, onToggle, onDelete, onCanc
         <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>{duration}</td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-1 justify-end">
+            {run.mail_draft && onShowMail && (
+              <button
+                onClick={() => onShowMail(run.id, run.mail_draft as MailDraft, PORTAL_DISPLAY[run.portal] ?? portalName)}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#22d3ee')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                title="E-Mail erstellen">
+                <Mail className="w-3.5 h-3.5" />
+              </button>
+            )}
             {run.status === 'running' && (
               <button onClick={onCancel} disabled={isCancelling}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-50"

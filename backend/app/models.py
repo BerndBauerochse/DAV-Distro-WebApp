@@ -15,6 +15,8 @@ class DeliveryRun(Base):
     )
     portal: Mapped[str] = mapped_column(String, nullable=False, index=True)
     metadata_filename: Mapped[str | None] = mapped_column(String)
+    # Absoluter Pfad zur Metadatei — für nachträgliche Mail-Anhänge nach Neustart
+    metadata_path: Mapped[str | None] = mapped_column(Text)
     initiated_by: Mapped[str | None] = mapped_column(String)
     takedown: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[str] = mapped_column(String, nullable=False, default="running")

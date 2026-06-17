@@ -96,6 +96,7 @@ async def start_delivery_run(
             id=run_id,
             portal=portal_key,
             metadata_filename=metadata_filename,
+            metadata_path=metadata_path,
             initiated_by=initiated_by,
             takedown=takedown,
             status="running",

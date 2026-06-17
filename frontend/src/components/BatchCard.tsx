@@ -1,8 +1,6 @@
-import { useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Loader2, Play, Trash2, ChevronDown, AlertTriangle, Upload } from 'lucide-react'
-import { useUpload } from '../contexts/UploadContext'
-import type { BatchPreview, BookInfo, FileCategory } from '../types'
+import { useState } from 'react'
+import { CheckCircle2, XCircle, Loader2, Play, Trash2, ChevronDown, AlertTriangle } from 'lucide-react'
+import type { BatchPreview, BookInfo } from '../types'
 
 const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
   audible:         { bg: 'rgba(251,146,60,0.15)', text: '#fb923c' },
@@ -27,65 +25,6 @@ interface Props {
   isStarting: boolean
 }
 
-/**
- * Inline-Upload-Button für fehlende ZIPs / Cover.
- * Beim Klick öffnet sich ein Dateidialog; nach erfolgreichem Upload wird
- * das Batch-Preview neu geladen, damit der Status auf "vorhanden" wechselt.
- */
-function MissingFileUpload({ ean, category, accept }: {
-  ean: string
-  category: FileCategory
-  accept: string
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const qc = useQueryClient()
-  const { uploads, startUpload } = useUpload()
-  const [done, setDone] = useState(false)
-
-  const expectedName = category === 'covers' ? `${ean}.jpg` : `${ean}.zip`
-  const task = uploads.find(u => u.filename === expectedName && u.status !== 'done')
-  const busy = task && (task.status === 'uploading' || task.status === 'queued')
-
-  function pickFile() {
-    inputRef.current?.click()
-  }
-
-  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    // Datei wird unter dem erwarteten Namen hochgeladen, damit der Parser sie findet
-    const renamed = new File([file], expectedName, { type: file.type })
-    startUpload(category, renamed, () => {
-      setDone(true)
-      // Preview neu laden — invalidates queries für 'preview' und 'files'
-      qc.invalidateQueries({ queryKey: ['files', category] })
-    })
-  }
-
-  if (done) {
-    return <CheckCircle2 className="w-4 h-4" style={{ color: '#4ade80' }} />
-  }
-
-  return (
-    <>
-      <button
-        onClick={pickFile}
-        disabled={busy}
-        title={busy ? `${task!.progress}%` : `${category === 'covers' ? 'Cover' : 'ZIP'} hochladen`}
-        className="p-1 rounded-md transition-colors disabled:opacity-60"
-        style={{ background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)' }}
-      >
-        {busy
-          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          : <Upload className="w-3.5 h-3.5" />
-        }
-      </button>
-      <input ref={inputRef} type="file" accept={accept} className="hidden" onChange={onFile} />
-    </>
-  )
-}
-
 function AbridgedBadge({ abridged }: { abridged: boolean | null }) {
   if (abridged === null) return null
   return abridged
@@ -105,9 +44,6 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
     preview.portal_variants[0]?.key ?? preview.detected_portal
   )
   const [takedown, setTakedown] = useState(false)
-  const folderInputRef = useRef<HTMLInputElement>(null)
-  const qc = useQueryClient()
-  const { startUpload } = useUpload()
 
   const isMoA        = selectedPortal.endsWith('_moa')
   const missingCount = preview.books.filter(b => isMoA ? !b.cover_available : !b.zip_available).length
@@ -115,94 +51,6 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const colors       = PORTAL_COLORS[selectedPortal] ?? PORTAL_COLORS.unknown
   const selectedLabel = preview.portal_variants.find(v => v.key === selectedPortal)?.label ?? 'Standard'
   const fileLabel    = isMoA ? 'Cover' : 'ZIP'
-  const category: FileCategory = isMoA ? 'covers' : 'zips'
-  const expectedExt = isMoA ? ['.jpg', '.jpeg', '.png'] : ['.zip']
-
-  /**
-   * Moderne Variante (Chrome/Edge): User wählt EINMAL den Ordner; die App
-   * greift sich dann gezielt selbst die Dateien {EAN}.zip / {EAN}.jpg der
-   * fehlenden Titel heraus — ohne manuelles Auswählen.
-   */
-  async function handlePickFolder() {
-    const missingEans = preview.books
-      .filter(b => isMoA ? !b.cover_available : !b.zip_available)
-      .map(b => b.ean)
-    if (missingEans.length === 0) return
-
-    // @ts-expect-error — File System Access API noch nicht in allen TS-libs
-    const picker = window.showDirectoryPicker
-    if (typeof picker !== 'function') {
-      // Fallback: klassische Mehrfachauswahl
-      folderInputRef.current?.click()
-      return
-    }
-
-    let dirHandle: any
-    try {
-      dirHandle = await picker({ id: 'dav-source', mode: 'read' })
-    } catch {
-      return // User hat abgebrochen
-    }
-
-    let matched = 0
-    const notFound: string[] = []
-    for (const ean of missingEans) {
-      let fileObj: File | null = null
-      for (const ext of expectedExt) {
-        try {
-          const fh = await dirHandle.getFileHandle(`${ean}${ext}`)
-          fileObj = await fh.getFile()
-          break
-        } catch {
-          // diese Endung gibt es nicht — nächste probieren
-        }
-      }
-      if (!fileObj) { notFound.push(ean); continue }
-      matched++
-      startUpload(category, fileObj, () => {
-        qc.invalidateQueries({ queryKey: ['files', category] })
-      })
-    }
-
-    if (matched === 0) {
-      alert(`Im gewählten Ordner wurde keine der fehlenden ${fileLabel}-Dateien gefunden.\nErwartet: nach EAN benannte Dateien (z.B. ${missingEans[0]}${expectedExt[0]}).`)
-    } else if (notFound.length > 0) {
-      alert(`${matched} ${fileLabel}(s) werden hochgeladen.\nNicht gefunden für EAN: ${notFound.join(', ')}`)
-    }
-  }
-
-  /** Fallback für Browser ohne File System Access API. */
-  function handleFolderPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
-    e.target.value = ''
-    if (files.length === 0) return
-
-    const missingEans = new Set(
-      preview.books
-        .filter(b => isMoA ? !b.cover_available : !b.zip_available)
-        .map(b => b.ean)
-    )
-
-    const matchedEans = new Set<string>()
-    for (const file of files) {
-      const name = file.name
-      const dot = name.lastIndexOf('.')
-      const stem = dot > 0 ? name.slice(0, dot) : name
-      const ext = dot > 0 ? name.slice(dot).toLowerCase() : ''
-      if (!expectedExt.includes(ext)) continue
-      if (!missingEans.has(stem)) continue
-      if (matchedEans.has(stem)) continue
-      matchedEans.add(stem)
-      startUpload(category, file, () => {
-        qc.invalidateQueries({ queryKey: ['files', category] })
-      })
-    }
-
-    const matched = matchedEans.size
-    if (matched === 0) {
-      alert(`Keine passenden ${fileLabel}-Dateien gefunden. Erwartet werden Dateien, die nach der EAN benannt sind (z.B. 9783742441454${expectedExt[0]}).`)
-    }
-  }
 
   return (
     <div className="glass-card overflow-hidden">
@@ -236,28 +84,9 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
 
         <div className="flex items-center gap-2 shrink-0">
           {missingCount > 0 && (
-            <>
-              <span className="text-xs font-medium" style={{ color: '#f87171' }}>
-                {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
-              </span>
-              <button
-                onClick={handlePickFolder}
-                title={`Ordner wählen — die fehlenden ${fileLabel}s ({EAN}${expectedExt[0]}) werden automatisch herausgesucht und hochgeladen`}
-                className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors"
-                style={{ background: 'rgba(248,113,113,0.18)', color: '#f87171', border: '1px solid rgba(248,113,113,0.35)' }}
-              >
-                <Upload className="w-3.5 h-3.5" />
-                Fehlende laden
-              </button>
-              <input
-                ref={folderInputRef}
-                type="file"
-                multiple
-                accept={expectedExt.join(',')}
-                className="hidden"
-                onChange={handleFolderPick}
-              />
-            </>
+            <span className="text-xs font-medium" style={{ color: '#f87171' }}>
+              {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
+            </span>
           )}
           {/* Takedown toggle */}
           <button
@@ -325,11 +154,7 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
                 <div className="w-6 flex justify-center">
                   {(isMoA ? book.cover_available : book.zip_available)
                     ? <CheckCircle2 className="w-4 h-4" style={{ color: '#4ade80' }} />
-                    : <MissingFileUpload
-                        ean={book.ean}
-                        category={isMoA ? 'covers' : 'zips'}
-                        accept={isMoA ? '.jpg,.jpeg,.png' : '.zip'}
-                      />
+                    : <XCircle      className="w-4 h-4" style={{ color: '#f87171' }} />
                   }
                 </div>
               </div>

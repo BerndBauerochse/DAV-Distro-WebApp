@@ -7,10 +7,11 @@ interface Props {
   runId: string
   draft: MailDraft
   portalName: string
+  queueCount?: number
   onClose: () => void
 }
 
-export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
+export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: Props) {
   const [attachmentError, setAttachmentError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -30,14 +31,20 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
         setAttachmentError('Anhang konnte nicht geladen werden.')
         return
       }
-      const buf = await res.arrayBuffer()
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
+      // Read attachment in chunks to avoid call-stack overflow on large files
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      let binary = ''
+      const CHUNK = 0x8000
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+      }
+      const b64 = btoa(binary)
       const boundary = `----=_Part_${Date.now()}`
       const bodyType = draft.is_html ? 'text/html' : 'text/plain'
-      // Base64-encode body so umlauts and special chars survive MIME encoding
-      const bodyBytes = new TextEncoder().encode(draft.body)
-      const bodyB64 = btoa(String.fromCharCode(...bodyBytes)).match(/.{1,76}/g)!.join('\r\n')
 
+      // Body inline (8-bit, charset utf-8) — identisch zum funktionierenden
+      // Einzelteil-Pfad. Outlook rendert base64-Plaintext-Teile teils nicht,
+      // daher der Body hier bewusst NICHT base64-kodiert.
       eml = [
         'MIME-Version: 1.0',
         'X-Unsent: 1',
@@ -47,9 +54,9 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
         '',
         `--${boundary}`,
         `Content-Type: ${bodyType}; charset=utf-8`,
-        'Content-Transfer-Encoding: base64',
+        'Content-Transfer-Encoding: 8bit',
         '',
-        bodyB64,
+        draft.body,
         '',
         `--${boundary}`,
         'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -107,7 +114,9 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
                 Mail-Entwurf – {portalName}
               </p>
               <p className="text-xs" style={{ color: 'var(--text-300)' }}>
-                Auslieferung abgeschlossen
+                {queueCount > 1
+                  ? `Auslieferung abgeschlossen · noch ${queueCount - 1} weitere${queueCount - 1 > 1 ? '' : ''} ausstehend`
+                  : 'Auslieferung abgeschlossen'}
               </p>
             </div>
           </div>
@@ -168,7 +177,7 @@ export function MailDraftModal({ runId, draft, portalName, onClose }: Props) {
         <div className="px-6 py-4 flex items-center justify-end gap-3"
           style={{ borderTop: '1px solid var(--glass-border)' }}>
           <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
-            Schließen
+            {queueCount > 1 ? 'Nächste' : 'Schließen'}
           </button>
           <button onClick={openAsEml} disabled={loading}
             className="btn-accent flex items-center gap-2 px-5 py-2 text-sm"

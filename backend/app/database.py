@@ -32,6 +32,10 @@ async def init_db():
             "CREATE TABLE IF NOT EXISTS user_settings "
             "(username TEXT PRIMARY KEY, avatar_data TEXT)"
         ))
+        # Migration: metadata_path für nachträgliche Mail-Anhänge
+        await conn.execute(text(
+            "ALTER TABLE delivery_runs ADD COLUMN IF NOT EXISTS metadata_path TEXT"
+        ))
         # Migration: title_catalog table (EAN → Titel/Autor)
         await conn.execute(text(
             "CREATE TABLE IF NOT EXISTS title_catalog "

@@ -246,78 +246,45 @@ Lieferstruktur auf dem SFTP:
 
 ---
 
-## Session 2026-05-13
+### Feature: Mail-Erstellung robust — Queue + nachträglich aus der Historie
 
-### Feature: Sortierung in allen Dateibereichen
+**Problem:** Nach einer Auslieferung erschien ein einzelnes Overlay zur
+Mail-Erstellung. Wurde es weggeklickt, war die Mail verloren. Bei zwei
+gleichzeitigen Auslieferungen (z.B. Audible + Zebra) überschrieb das eine
+Overlay das andere — nur eine Mail konnte erzeugt werden.
 
-**Ziel:** Die Sort-Controls (Neu / Alt / EAN ↑ / EAN ↓), die bisher nur im Cover-Bereich vorhanden waren, auf ZIPs, TOC, PDFs und Metadaten übertragen.
+**Lösung:** Die Maildaten liegen ohnehin dauerhaft in `DeliveryRun.mail_draft`.
+Genutzt wird das jetzt überall.
 
-**Änderungen (`frontend/src/components/FileManager.tsx`)**
-- `coverSort` → `sortOrder` — gilt jetzt für alle Kategorien
-- `sortedFiles` sortiert immer (war vorher nur bei Covers aktiv)
-- Sort-Controls als eigene `sortControls`-Variable extrahiert und im Header aller Listenbereiche eingebunden
-- Commits: `5811436`
+- `frontend/src/App.tsx`: Einzel-Overlay → **Queue** (`mailQueue`). Mehrere
+  Entwürfe stapeln sich, „Nächste" blättert durch, kein Überschreiben mehr.
+- `frontend/src/components/MailDraftModal.tsx`: zeigt „noch X weitere ausstehend",
+  Button „Nächste"/„Schließen".
+- `frontend/src/components/History.tsx`: neuer **Mail-Button** in jeder Zeile mit
+  vorhandenem `mail_draft` → Mail jederzeit nachträglich erzeugbar (öffnet dasselbe
+  Modal via `onShowMail`).
 
----
+**Persistenter Mail-Anhang (für nachträgliche Erstellung nach Neustart):**
+- `backend/app/models.py` + `database.py`: neue Spalte `delivery_runs.metadata_path`
+- `backend/app/services/delivery_service.py`: Pfad beim Run-Start mitschreiben
+- `backend/app/routers/runs.py`: Download-Endpunkt nutzt jetzt In-Memory-Cache
+  **oder** den persistierten DB-Pfad → Anhang bleibt auch nach Container-Neustart verfügbar
 
-### Feature: Titelkatalog aus n8n-Webhook
+### Bugfix: Zebra-Mail-Body wurde nicht übernommen
 
-**Ziel:** Einmal täglich EAN → Titel / Autor vom n8n-Webhook laden und in der App überall dort anzeigen, wo bisher nur die EAN sichtbar war (Dateiliste, Auslieferungshistorie).
+**Ursache:** Bei Mails mit Anhang (Zebra) wurde der Body im Multipart-EML
+base64-kodiert — Outlook rendert solche Plaintext-Teile teils nicht, der
+Body blieb leer. (Audible ohne Anhang nutzt den Einzelteil-Pfad → funktionierte.)
 
-**Webhook:** `https://n8n.der-audio-verlag.de/webhook/49dd3f5e-dc77-496e-a099-0115828c1161`  
-Liefert JSON mit Feldern: `EAN_digital`, `Titel`, `Autor`, `Sprecher`, `Inhaltsbeschreibung`, `ET`, …
+**Fix (`MailDraftModal.tsx`):** Body im Multipart jetzt **inline (8-bit, utf-8)**,
+identisch zum funktionierenden Audible-Pfad. Zusätzlich Attachment-Base64
+chunkweise erzeugt (kein Call-Stack-Overflow bei großen Dateien).
 
-#### Backend
+### Entfernt: Auto-Import fehlender ZIPs/Cover
 
-**Neue Tabelle `title_catalog`** (`backend/app/models.py`, `backend/app/database.py`)
-```sql
-CREATE TABLE title_catalog (
-  ean       TEXT PRIMARY KEY,
-  titel     TEXT NOT NULL,
-  autor     TEXT NOT NULL,
-  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
-Migration läuft automatisch beim App-Start via `init_db()`.
-
-**Neuer Router `backend/app/routers/catalog.py`**
-- `GET /api/catalog` — gibt `{ "EAN": { "titel": "...", "autor": "..." } }` zurück (auth required)
-- `POST /api/catalog/sync` — manueller Sync-Trigger (auth required)
-- Fetch via `urllib.request` (keine externe Abhängigkeit nötig)
-- Upsert per `ON CONFLICT (ean) DO UPDATE`
-
-**Background-Task (`backend/app/main.py`)**
-- Beim App-Start sofort ein Sync, danach alle 24 Stunden
-- Task-Referenz wird in einem `set` gehalten um Garbage-Collection zu verhindern
-
-#### Frontend
-
-**`frontend/src/types/index.ts`**
-- Neuer Typ `CatalogEntry { titel, autor }` und `CatalogMap`
-
-**`frontend/src/api/client.ts`**
-- `api.getCatalog()` → `GET /api/catalog`
-- `api.syncCatalog()` → `POST /api/catalog/sync`
-
-**`frontend/src/components/FileManager.tsx`**
-- Katalog per `useQuery` geladen (staleTime 1h)
-- In der Dateiliste: Titel (lila) + Autor als zweite Zeile unter dem Dateinamen, wenn EAN im Katalog gefunden
-
-**`frontend/src/components/History.tsx`**
-- Katalog per `useQuery` geladen
-- EAN-Chips zeigen hinter der EAN den Titelnamen
-- In der aufgeklappten Log-Tabelle: Titel als zweite Zeile unter der EAN
-
-#### Bugfixes während Rollout
-
-| Commit | Problem | Fix |
-|--------|---------|-----|
-| `79e998f` | `httpx` nicht in `requirements.txt` → Container-Crash | `httpx` durch `urllib.request` + `asyncio.to_thread` ersetzt |
-| `b955049` | `asyncio.create_task()` ohne gespeicherte Referenz → GC verwarf den Task vor Ausführung | Referenz in `_background_tasks: set` gespeichert |
-| `ad34485` | `Autor = null` im Webhook für manche Titel → `NOT NULL`-Constraint bricht Sync ab | `item.get("Autor") or ""` statt `item.get("Autor", "")` |
-
-#### Commits
-- `5811436` — feat: Titelkatalog aus n8n-Webhook
-- `79e998f` — fix: httpx durch urllib stdlib ersetzen
-- `b955049` — fix: Task-Referenz für asyncio.create_task halten (GC-Bug)
-- `ad34485` — fix: Autor kann null sein
+Die Funktion „Fehlende laden" / Einzel-Upload aus der BatchCard wurde wieder
+entfernt. Ein Browser kann nicht ohne Nutzerinteraktion auf das lokale
+Dateisystem zugreifen; die Zwischenlösung (Datei-/Ordnerdialog) war nicht der
+gewünschte vollautomatische Import. BatchCard zeigt fehlende Dateien wieder
+nur als rotes X an. Für echte Automatik wäre ein Desktop-Watcher nötig
+(SFTP-Upload außerhalb des Browsers).

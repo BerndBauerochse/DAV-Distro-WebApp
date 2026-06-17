@@ -297,7 +297,8 @@ async def download_run_metadata(
     if not run:
         clear_metadata_path(str(run_id))
         raise HTTPException(status_code=404, detail="Run not found")
-    path = get_metadata_path(str(run_id))
+    # Erst In-Memory-Cache, dann persistenter Pfad aus der DB (nach Neustart)
+    path = get_metadata_path(str(run_id)) or run.metadata_path
     if not path or not os.path.isfile(path):
         raise HTTPException(status_code=404, detail="Metadatei nicht (mehr) verfügbar")
     return FileResponse(path=path, filename=os.path.basename(path))

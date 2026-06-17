@@ -101,11 +101,21 @@ export function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [fileTab, setFileTab] = useState<FileCategory>('zips')
   const { avatar, set: setAvatar } = useAvatar(auth.username)
-  const [mailDraft, setMailDraft] = useState<{ runId: string; draft: MailDraft; portalName: string } | null>(null)
+  // Queue statt Einzel-Overlay: mehrere Mail-Entwürfe (z.B. Audible + Zebra)
+  // können gleichzeitig anstehen, ohne sich gegenseitig zu überschreiben.
+  const [mailQueue, setMailQueue] = useState<{ runId: string; draft: MailDraft; portalName: string }[]>([])
   const batchBuilderRef = useRef<BatchBuilderHandle>(null)
 
   const handleMailDraft = useCallback((runId: string, draft: MailDraft, portalName: string) => {
-    setMailDraft({ runId, draft, portalName })
+    setMailQueue(prev => {
+      // Doppelte (gleicher Run) nicht erneut einreihen
+      if (prev.some(m => m.runId === runId)) return prev
+      return [...prev, { runId, draft, portalName }]
+    })
+  }, [])
+
+  const closeTopDraft = useCallback(() => {
+    setMailQueue(prev => prev.slice(1))
   }, [])
 
   const handleUseForDelivery = useCallback((filename: string) => {
@@ -135,13 +145,14 @@ export function App() {
           <div className="orb orb-3" />
           <div className="grain" />
 
-          {/* ── Mail Draft Modal — rendered at root level so it shows on any page ── */}
-          {mailDraft && (
+          {/* ── Mail Draft Modal — zeigt den obersten Entwurf der Queue ── */}
+          {mailQueue.length > 0 && (
             <MailDraftModal
-              runId={mailDraft.runId}
-              draft={mailDraft.draft}
-              portalName={mailDraft.portalName}
-              onClose={() => setMailDraft(null)}
+              runId={mailQueue[0].runId}
+              draft={mailQueue[0].draft}
+              portalName={mailQueue[0].portalName}
+              queueCount={mailQueue.length}
+              onClose={closeTopDraft}
             />
           )}
 
@@ -287,7 +298,7 @@ export function App() {
 
                 {/* Pages — all mounted, inactive hidden */}
                 <div className={page !== 'dashboard' ? 'hidden' : 'fade-up stagger-2'}><Dashboard onMailDraft={handleMailDraft} batchBuilderRef={batchBuilderRef} /></div>
-                <div className={page !== 'history'   ? 'hidden' : 'fade-up stagger-2'}><History /></div>
+                <div className={page !== 'history'   ? 'hidden' : 'fade-up stagger-2'}><History onShowMail={handleMailDraft} /></div>
                 <div className={page !== 'files'     ? 'hidden' : 'fade-up stagger-2'}><FileManager onUseForDelivery={handleUseForDelivery} activeTab={fileTab} onTabChange={setFileTab} /></div>
               </div>
             </main>
