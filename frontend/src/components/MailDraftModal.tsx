@@ -11,6 +11,43 @@ interface Props {
   onClose: () => void
 }
 
+/**
+ * Quoted-Printable-Kodierung (RFC 2045) auf UTF-8-Basis.
+ * Harte Zeilenumbrüche werden als CRLF erhalten, Nicht-ASCII (Umlaute) als =XX
+ * kodiert, Zeilen auf max. 76 Zeichen mit Soft-Breaks (=) umgebrochen.
+ */
+function encodeQuotedPrintable(input: string): string {
+  const bytes = new TextEncoder().encode(input.replace(/\r\n/g, '\n').replace(/\r/g, '\n'))
+  const lines: string[] = []
+  let line = ''
+  const flushSoft = () => { lines.push(line + '='); line = '' }
+
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i]
+    if (b === 0x0a) {            // harter Zeilenumbruch
+      // evtl. trailing space/tab am Zeilenende kodieren
+      if (line.endsWith(' ') || line.endsWith('\t')) {
+        const c = line.slice(-1)
+        line = line.slice(0, -1) + '=' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')
+      }
+      lines.push(line); line = ''
+      continue
+    }
+    let token: string
+    if (b === 0x3d) {                                   // '='
+      token = '=3D'
+    } else if ((b >= 0x21 && b <= 0x7e) || b === 0x20 || b === 0x09) {
+      token = String.fromCharCode(b)                    // druckbares ASCII, Space, Tab
+    } else {
+      token = '=' + b.toString(16).toUpperCase().padStart(2, '0')
+    }
+    if (line.length + token.length > 75) flushSoft()
+    line += token
+  }
+  if (line.length > 0) lines.push(line)
+  return lines.join('\r\n')
+}
+
 export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: Props) {
   const [attachmentError, setAttachmentError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,6 +56,10 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
     setLoading(true)
     setAttachmentError('')
     try {
+    const bodyType = draft.is_html ? 'text/html' : 'text/plain'
+    // Body als quoted-printable kodieren — überträgt Umlaute korrekt und wird
+    // von Outlook zuverlässig gerendert (im Gegensatz zu rohem 8-bit/base64).
+    const bodyQP = encodeQuotedPrintable(draft.body)
     let eml: string
 
     if (draft.attachment) {
@@ -40,11 +81,7 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
       }
       const b64 = btoa(binary)
       const boundary = `----=_Part_${Date.now()}`
-      const bodyType = draft.is_html ? 'text/html' : 'text/plain'
 
-      // Body inline (8-bit, charset utf-8) — identisch zum funktionierenden
-      // Einzelteil-Pfad. Outlook rendert base64-Plaintext-Teile teils nicht,
-      // daher der Body hier bewusst NICHT base64-kodiert.
       eml = [
         'MIME-Version: 1.0',
         'X-Unsent: 1',
@@ -54,9 +91,9 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
         '',
         `--${boundary}`,
         `Content-Type: ${bodyType}; charset=utf-8`,
-        'Content-Transfer-Encoding: 8bit',
+        'Content-Transfer-Encoding: quoted-printable',
         '',
-        draft.body,
+        bodyQP,
         '',
         `--${boundary}`,
         'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -68,18 +105,21 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
         `--${boundary}--`,
       ].join('\r\n')
     } else {
-      // Simple single-part EML
-      const bodyType = draft.is_html ? 'text/html' : 'text/plain'
+      // Single-part EML
       eml = [
         'MIME-Version: 1.0',
         'X-Unsent: 1',
         `To: ${draft.to}`,
         `Subject: ${draft.subject}`,
         `Content-Type: ${bodyType}; charset=utf-8`,
+        'Content-Transfer-Encoding: quoted-printable',
         '',
-        draft.body,
+        bodyQP,
       ].join('\r\n')
     }
+
+    // Sicherstellen, dass das gesamte EML konsequent CRLF nutzt
+    eml = eml.replace(/\r?\n/g, '\r\n')
 
     const blob = new Blob([eml], { type: 'message/rfc822' })
     const url = URL.createObjectURL(blob)
