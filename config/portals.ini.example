@@ -12,7 +12,7 @@ username = deftp_dave
 encrypted_password = HIER_BASE64_PASSWORT
 remote_path = /
 export_dir = /data/export/audible
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Audible_MoA]
 type = sftp
@@ -31,7 +31,7 @@ username = deftp_dave
 encrypted_password = HIER_BASE64_PASSWORT
 remote_path = /
 export_dir = /data/export/audible
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Google]
 type = sftp
@@ -45,7 +45,7 @@ xml_sftp_username = DEIN_USERNAME
 xml_sftp_password = DEIN_PASSWORT
 xml_remote_dir = /onix/DEIN_ORDNER
 export_dir = /data/export/google
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Bookwire]
 type = sftp
@@ -56,7 +56,7 @@ sftp_password_base64 = HIER_BASE64_PASSWORT
 remote_dir = /assets
 remote_dir_xml = /xml
 export_dir = /data/export/bookwire
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Zebra]
 type = sftp
@@ -67,7 +67,7 @@ sftp_password_base64 = HIER_BASE64_PASSWORT
 remote_dir = /
 remote_metadata_dir = /Metadaten
 export_dir = /data/export/zebra
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_RTL+]
 type = sftp
@@ -76,7 +76,7 @@ sftp_port = 22
 sftp_username = dav
 sftp_password_base64 = HIER_BASE64_PASSWORT
 export_dir = /data/export/rtl
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Divibib]
 type = ftp
@@ -85,7 +85,7 @@ ftp_port = 21
 ftp_username = dav
 ftp_password_base64 = HIER_BASE64_PASSWORT
 export_dir = /data/export/divibib
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Bookbeat]
 type = sftp
@@ -94,7 +94,7 @@ sftp_port = 22
 sftp_username = prodbbsftp.deraudioverlag
 sftp_password_base64 = HIER_BASE64_PASSWORT
 export_dir = /data/export/bookbeat
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Spotify]
 type = sftp
@@ -103,7 +103,7 @@ sftp_port = 2222
 sftp_username = deraudioverlagdig
 sftp_password = DEIN_PASSWORT
 export_dir = /data/export/spotify
-source_dir = /data/source
+source_dir = /storage/zips
 
 [Portal_Storytel]
 type = sftp
@@ -113,4 +113,4 @@ sftp_username = STORYTEL_USER
 sftp_password_base64 = STORYTEL_PASSWORD_BASE64
 remote_dir = /
 export_dir = /data/export/storytel
-source_dir = /data/source
+source_dir = /storage/zips
