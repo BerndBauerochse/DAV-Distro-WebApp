@@ -59,6 +59,7 @@ PORTAL_DISPLAY_NAMES = {
     "zebra": "Zebra",
     "rtl": "RTL+",
     "divibib": "Divibib",
+    "storytel": "Storytel",
 }
 
 

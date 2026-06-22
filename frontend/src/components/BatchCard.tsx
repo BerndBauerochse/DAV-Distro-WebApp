@@ -15,6 +15,7 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
   zebra:           { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.6)' },
   rtl:             { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
   divibib:         { bg: 'rgba(34,211,238,0.15)', text: '#22d3ee' },
+  storytel:        { bg: 'rgba(244,114,182,0.15)', text: '#f472b6' },
   unknown:         { bg: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.4)' },
 }
 

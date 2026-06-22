@@ -187,7 +187,7 @@ export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function Batch
         <input
           ref={inputRef}
           type="file"
-          accept=".xml,.xlsx,.xls"
+          accept=".xml,.xlsx,.xls,.zip"
           multiple
           className="hidden"
           onChange={e => e.target.files && addFiles(e.target.files)}

@@ -89,8 +89,20 @@ def get_portal_variants(portal: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def parse_metadata(file_path: str, filename: str, source_dir: str, covers_dir: str = "") -> BatchPreview:
-    portal = detect_portal(filename)
     lower = filename.lower()
+
+    # Storytel: Metadaten sind eine ZIP voller {EAN}.xml-Dateien
+    if lower.endswith(".zip"):
+        portal = "storytel"
+        books = _parse_storytel_zip(file_path, source_dir, covers_dir)
+        return BatchPreview(
+            filename=filename,
+            detected_portal=portal,
+            portal_variants=get_portal_variants(portal),
+            books=books,
+        )
+
+    portal = detect_portal(filename)
 
     if lower.endswith(".xml"):
         books = _parse_onix_xml(file_path, source_dir, covers_dir)
@@ -108,6 +120,44 @@ def parse_metadata(file_path: str, filename: str, source_dir: str, covers_dir: s
         portal_variants=get_portal_variants(portal),
         books=books,
     )
+
+
+def _parse_storytel_zip(file_path: str, source_dir: str, covers_dir: str = "") -> list[BookInfo]:
+    """Liest die {EAN}.xml-Namen aus der Storytel-Metadaten-ZIP. Titel/Autor
+    werden best-effort aus dem ONIX-Inhalt gelesen, falls vorhanden."""
+    import xml.etree.ElementTree as ET
+    from zipfile import ZipFile
+
+    ns = {"ns": "http://ns.editeur.org/onix/3.0/reference"}
+    books: list[BookInfo] = []
+    try:
+        with ZipFile(file_path, "r") as zf:
+            xml_names = [n for n in zf.namelist() if n.lower().endswith(".xml")]
+            for name in xml_names:
+                ean = os.path.splitext(os.path.basename(name))[0].strip()
+                if not ean:
+                    continue
+                title, author, abridged = "", "", None
+                try:
+                    with zf.open(name) as fh:
+                        root = ET.parse(fh).getroot()
+                    p = root.find(".//ns:Product", ns) or root
+                    t = p.find(".//ns:TitleDetail/ns:TitleElement/ns:TitleText", ns)
+                    title = t.text.strip() if t is not None and t.text else ""
+                    author = _onix_author(p, ns)
+                    fd = p.find(".//ns:ProductFormDetail", ns)
+                    abridged = _FORM_DETAIL_MAP.get(fd.text.strip(), None) if fd is not None and fd.text else None
+                except Exception:
+                    pass  # Titel/Autor optional — EAN reicht
+                zip_available = os.path.isfile(os.path.join(source_dir, f"{ean}.zip"))
+                cover_available = bool(covers_dir and os.path.isfile(os.path.join(covers_dir, f"{ean}.jpg")))
+                books.append(BookInfo(
+                    ean=ean, title=title, author=author,
+                    abridged=abridged, zip_available=zip_available, cover_available=cover_available,
+                ))
+    except Exception as e:
+        logger.error(f"Storytel ZIP parse error: {e}")
+    return books
 
 
 # ---------------------------------------------------------------------------

@@ -246,6 +246,37 @@ Lieferstruktur auf dem SFTP:
 
 ---
 
+### Feature: Neuer Kanal Storytel (Files.com SFTP)
+
+**Besonderheit:** Storytel weicht stark von den anderen Kanälen ab.
+
+- **Eingangs-Metadaten** sind eine **ZIP voller `{EAN}.xml`** (nicht einzelne XML).
+- Pro Titel wird ein **eigener Ordner** gebaut, der **ausschließlich** Cover
+  (.jpg/.jpeg/.png), MP3-Dateien und die passende `{EAN}.xml` enthält.
+- **Ausschlussregel:** PDF, TXT, XLSX und sonstige Begleitdateien werden
+  entfernt (Allowlist `.xml/.mp3/.jpg/.jpeg/.png`).
+- Hochgeladen werden die fertigen **Titelordner** per SFTP (`/{EAN}/...`).
+
+#### Umsetzung
+- `backend/app/modules/storytel.py` (neu):
+  - Metadaten-ZIP entpacken → `{EAN: xml}`-Map
+  - je EAN: Quell-`{EAN}.zip` entpacken, erlaubte Dateien flach in
+    `export_dir/{EAN}/` kopieren, XML dazulegen, Allowlist erzwingen
+  - `ship()`: Titelordner parallel per SFTP hochladen (Retries, makedirs)
+  - **keine** PDF-Injektion, **kein** Mail-Entwurf
+- `backend/app/main.py`: Modul-Import
+- `backend/app/services/delivery_service.py`: `PORTAL_DISPLAY_NAMES["storytel"]`
+- `backend/app/modules/metadata_parser.py`: `.zip` → Storytel-Preview
+  (`_parse_storytel_zip` liest EANs aus XML-Namen, Titel/Autor best-effort aus ONIX)
+- `config/portals.ini(.example)`: Abschnitt `[Portal_Storytel]` (Platzhalter)
+- `frontend/src/components/BatchCard.tsx`: Farbe für `storytel`
+- `frontend/src/components/BatchBuilder.tsx`: `.zip` in der Datei-Auswahl erlaubt
+
+**Offen:** echte Files.com-SFTP-Zugangsdaten in `[Portal_Storytel]` eintragen
+(Host, User, `sftp_password_base64`) sowie `remote_dir` bestätigen.
+
+---
+
 ### Feature: Mail-Erstellung robust — Queue + nachträglich aus der Historie
 
 **Problem:** Nach einer Auslieferung erschien ein einzelnes Overlay zur

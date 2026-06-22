@@ -26,6 +26,7 @@ import app.modules.google       # noqa: F401
 import app.modules.zebra        # noqa: F401
 import app.modules.rtl          # noqa: F401
 import app.modules.divibib      # noqa: F401
+import app.modules.storytel     # noqa: F401
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -104,3 +104,13 @@ sftp_username = deraudioverlagdig
 sftp_password = DEIN_PASSWORT
 export_dir = /data/export/spotify
 source_dir = /data/source
+
+[Portal_Storytel]
+type = sftp
+sftp_host = STORYTEL_FILES_COM_HOST
+sftp_port = 22
+sftp_username = STORYTEL_USER
+sftp_password_base64 = STORYTEL_PASSWORD_BASE64
+remote_dir = /
+export_dir = /data/export/storytel
+source_dir = /data/source
