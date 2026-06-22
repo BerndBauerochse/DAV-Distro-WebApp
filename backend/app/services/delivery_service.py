@@ -364,8 +364,10 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
     if final_status == "completed":
         try:
             mail_draft = module.get_mail_draft(user=initiated_by)
+            if mail_draft is None:
+                logger.warning("Kein Mail-Entwurf für %s (Run %s) erzeugt", portal_key, run_id)
         except Exception:
-            pass
+            logger.exception("get_mail_draft fehlgeschlagen für %s (Run %s)", portal_key, run_id)
 
     # Inject attachment info if the module requested it and metadata is available
     if mail_draft and mail_draft.pop("has_attachment", False) and metadata_path:
