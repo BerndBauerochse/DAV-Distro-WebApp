@@ -131,11 +131,13 @@ class StorytelModule(BasePortalModule):
 
         transfers: list[FileTransfer] = []
         remote_base = self.remote_dir.rstrip("/")
+        missing_eans: list[str] = []
 
         for ean, xml_src in xml_map.items():
             zip_src = os.path.join(self.source_dir, f"{ean}.zip")
             if not os.path.isfile(zip_src):
                 logger.warning("Storytel: Quell-ZIP fehlt für EAN %s: %s", ean, zip_src)
+                missing_eans.append(ean)
                 continue
             try:
                 folder = self._build_title_folder(ean, zip_src, xml_src)
@@ -160,6 +162,12 @@ class StorytelModule(BasePortalModule):
                     destination=f"{remote_base}/{ean}/{fname}",
                     file_size_bytes=os.path.getsize(full_path),
                 ))
+
+        if not transfers and missing_eans:
+            raise RuntimeError(
+                f"Keine Master-ZIP gefunden in '{self.source_dir}'. "
+                f"Erwartet: {', '.join(f'{e}.zip' for e in missing_eans)}"
+            )
 
         return transfers
 
