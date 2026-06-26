@@ -129,6 +129,20 @@ export const api = {
     return request('/catalog')
   },
 
+  getCoverExchangePortals(): Promise<Portal[]> {
+    return request('/covers/exchange/portals')
+  },
+
+  exchangeCovers(portals: string[], filenames: string[]): Promise<{
+    results: { portal: string; filename: string | null; status: string; error: string | null }[]
+  }> {
+    return request('/covers/exchange', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portals, filenames }),
+    })
+  },
+
   syncCatalog(): Promise<{ synced: number }> {
     return request('/catalog/sync', { method: 'POST' })
   },

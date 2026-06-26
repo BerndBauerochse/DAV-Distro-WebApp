@@ -124,6 +124,7 @@ class AudibleModule(BasePortalModule):
         self.username = self._get(sec, "username", "deftp_dave")
         self.password = _decode_password(config, sec)
         self.remote_path = self._get(sec, "remote_path", "/")
+        self.cover_exchange_dir = self._get(sec, "cover_exchange_dir", "")
         self._mail_draft_data: dict | None = None
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:

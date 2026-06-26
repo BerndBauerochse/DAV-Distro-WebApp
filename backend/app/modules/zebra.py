@@ -48,6 +48,7 @@ class ZebraModule(BasePortalModule):
         self.password = base64.b64decode(pw_b64).decode() if pw_b64 else self._get(sec, "sftp_password")
         self.remote_dir = self._get(sec, "remote_dir", "/")
         self.remote_metadata_dir = self._get(sec, "remote_metadata_dir", "/Metadaten")
+        self.cover_exchange_dir = self._get(sec, "cover_exchange_dir", "")
         self._extracted_count = 0
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:

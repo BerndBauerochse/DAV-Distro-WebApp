@@ -5,6 +5,7 @@
 base_path = /app
 
 [Portal_Audible]
+cover_exchange_dir = /Cover_Austausch/
 type = sftp
 host = dar-eu.amazon-digital-ftp.com
 port = 22
@@ -59,6 +60,7 @@ export_dir = /data/export/bookwire
 source_dir = /storage/zips
 
 [Portal_Zebra]
+cover_exchange_dir = /Cover_Austausch
 type = sftp
 sftp_host = ftp.media-ems.com
 sftp_port = 2201

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square, Play } from 'lucide-react'
+import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square, Play, Send } from 'lucide-react'
 import { api } from '../api/client'
 import { useUpload } from '../contexts/UploadContext'
 import { getStoredAuth } from '../hooks/useAuth'
@@ -75,6 +75,7 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
   const [deletingFile, setDeletingFile] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'ean_asc' | 'ean_desc'>('newest')
+  const [exchangeTargets, setExchangeTargets] = useState<Set<string>>(new Set())
   const { uploads, startUpload } = useUpload()
 
   const { data: files = [], isLoading, isError } = useQuery({
@@ -119,6 +120,34 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['files', category.key] }),
   })
+
+  // Cover-Austausch: verfügbare Zielkanäle + Versand-Mutation (nur Cover-Bereich)
+  const { data: exchangePortals = [] } = useQuery({
+    queryKey: ['cover-exchange-portals'],
+    queryFn: api.getCoverExchangePortals,
+    enabled: category.key === 'covers',
+    staleTime: 60 * 60 * 1000,
+  })
+
+  const exchangeMutation = useMutation({
+    mutationFn: (vars: { portals: string[]; filenames: string[] }) =>
+      api.exchangeCovers(vars.portals, vars.filenames),
+    onSuccess: (data) => {
+      const failed = data.results.filter(r => r.status !== 'success')
+      const ok = data.results.filter(r => r.status === 'success').length
+      if (failed.length === 0) {
+        alert(`Cover-Austausch erfolgreich: ${ok} Übertragung(en).`)
+      } else {
+        const lines = failed.map(r => `• ${r.portal}${r.filename ? ' / ' + r.filename : ''}: ${r.error ?? 'Fehler'}`)
+        alert(`Cover-Austausch teils fehlgeschlagen.\nErfolgreich: ${ok}\n\nFehler:\n${lines.join('\n')}`)
+      }
+    },
+    onError: (err) => alert(`Cover-Austausch fehlgeschlagen: ${(err as Error).message}`),
+  })
+
+  function toggleExchangeTarget(key: string) {
+    setExchangeTargets(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
+  }
 
   function handleFiles(fl: FileList | null) {
     if (!fl) return
@@ -257,6 +286,40 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
           </button>
         )}
       </div>
+
+      {/* Cover-Austausch — Kanäle wählen + ausgewählte Cover versenden */}
+      {isCovers && selected.size > 0 && exchangePortals.length > 0 && (
+        <div className="rounded-xl p-3 space-y-2"
+          style={{ background: 'rgba(34,211,238,0.05)', border: '1px solid rgba(34,211,238,0.18)' }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="section-label">Cover-Austausch an:</span>
+            {exchangePortals.map(p => {
+              const on = exchangeTargets.has(p.key)
+              return (
+                <button key={p.key} onClick={() => toggleExchangeTarget(p.key)}
+                  className="text-xs px-2.5 py-1 rounded-lg transition-colors"
+                  style={on
+                    ? { background: 'rgba(34,211,238,0.2)', color: '#22d3ee', border: '1px solid rgba(34,211,238,0.4)' }
+                    : { color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }
+                  }>
+                  {on ? '✓ ' : ''}{p.name}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => exchangeMutation.mutate({ portals: [...exchangeTargets], filenames: [...selected] })}
+              disabled={exchangeTargets.size === 0 || exchangeMutation.isPending}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl disabled:opacity-40 transition-colors"
+              style={{ background: '#0891b2', color: '#ffffff', border: '1px solid #06b6d4' }}
+            >
+              {exchangeMutation.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Sendet…</>
+                : <><Send className="w-3 h-3" /> {selected.size} Cover austauschen</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
 
       {isLoading && <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--text-muted)' }} /></div>}
       {isError  && <div className="text-sm text-center py-4" style={{ color: '#f87171' }}>Fehler beim Laden</div>}

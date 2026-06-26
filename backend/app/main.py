@@ -11,6 +11,7 @@ from app.routers import runs, portals, files as files_router
 from app.routers import auth as auth_router
 from app.routers import users as users_router
 from app.routers import catalog as catalog_router
+from app.routers import covers as covers_router
 from app.routers.catalog import fetch_and_store_catalog
 from app.websocket_manager import ws_manager
 from app.services.file_watcher import start_file_watcher
@@ -75,6 +76,7 @@ app.include_router(portals.router, prefix="/api")
 app.include_router(files_router.router, prefix="/api")
 app.include_router(users_router.router, prefix="/api")
 app.include_router(catalog_router.router, prefix="/api")
+app.include_router(covers_router.router, prefix="/api")
 
 
 @app.websocket("/ws")

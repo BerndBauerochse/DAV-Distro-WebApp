@@ -42,6 +42,10 @@ class BasePortalModule(ABC):
           Performs the actual FTP/SFTP upload.
     """
 
+    # Remote-Ordner für den Cover-Austausch (z.B. /Cover_Austausch).
+    # Subklassen setzen dies aus der Config, wenn der Kanal das unterstützt.
+    cover_exchange_dir: str = ""
+
     def __init__(self, config: configparser.ConfigParser, portal_name: str):
         self.config = config
         self.portal_name = portal_name
@@ -82,6 +86,32 @@ class BasePortalModule(ABC):
             zf.write(pdf_src, arcname=f"{ean}_booklet.pdf")
         logger.info("PDF für %s in ZIP eingefügt: %s_booklet.pdf", ean, ean)
         return True
+
+    def supports_cover_exchange(self) -> bool:
+        """True, wenn der Kanal einen Cover-Austausch-Ordner + SFTP-Zugang hat."""
+        return bool(self.cover_exchange_dir and getattr(self, "host", "")
+                    and getattr(self, "username", ""))
+
+    def exchange_covers(self, cover_paths: list[str]) -> list[tuple[str, str, str | None]]:
+        """Lädt die angegebenen Cover-Dateien in den Cover-Austausch-Ordner (SFTP).
+        Gibt je Datei (dateiname, status, fehler) zurück."""
+        from app.modules.ftp_helper import sftp_connection, sftp_upload, sftp_makedirs
+
+        remote_dir = self.cover_exchange_dir.rstrip("/") or "/"
+        results: list[tuple[str, str, str | None]] = []
+        with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
+            if remote_dir != "/":
+                sftp_makedirs(sftp, remote_dir)
+            for path in cover_paths:
+                fname = os.path.basename(path)
+                try:
+                    sftp_upload(sftp, path, f"{remote_dir}/{fname}")
+                    results.append((fname, "success", None))
+                    logger.info("Cover-Austausch: %s → %s%s", fname, self.portal_name, remote_dir)
+                except Exception as e:
+                    results.append((fname, "failed", str(e)))
+                    logger.error("Cover-Austausch fehlgeschlagen %s → %s: %s", fname, self.portal_name, e)
+        return results
 
     def _get(self, section: str, key: str, fallback: str = "") -> str:
         return self.config.get(section, key, fallback=fallback)
