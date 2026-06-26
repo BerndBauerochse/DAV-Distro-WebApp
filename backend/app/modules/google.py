@@ -39,8 +39,30 @@ class GoogleModule(BasePortalModule):
         self.xml_user = self._get(sec, "xml_sftp_username")
         self.xml_password = self._get(sec, "xml_sftp_password")
         self.xml_remote_dir = self._get(sec, "xml_remote_dir", "/onix/L0KYSE7-full")
+        self.cover_exchange_dir = self._get(sec, "cover_exchange_dir", "")
         # Temp dir for processed ZIPs — set during get_files(), cleaned up after ship()
         self._workdir: str | None = None
+
+    def supports_cover_exchange(self) -> bool:
+        return bool(self.zip_host and self.zip_user)
+
+    def exchange_covers(self, cover_paths: list[str]) -> list[tuple[str, str, str | None]]:
+        """Google nutzt zwei SFTP-Server — Cover gehen auf den ZIP-Server."""
+        from app.modules.ftp_helper import sftp_connection, sftp_upload, sftp_makedirs
+        remote_dir = (self.cover_exchange_dir or "/").rstrip("/") or "/"
+        base = "" if remote_dir == "/" else remote_dir
+        results: list[tuple[str, str, str | None]] = []
+        with sftp_connection(self.zip_host, self.zip_port, self.zip_user, self.zip_password) as sftp:
+            if remote_dir != "/":
+                sftp_makedirs(sftp, remote_dir)
+            for path in cover_paths:
+                fname = os.path.basename(path)
+                try:
+                    sftp_upload(sftp, path, f"{base}/{fname}")
+                    results.append((fname, "success", None))
+                except Exception as e:
+                    results.append((fname, "failed", str(e)))
+        return results
 
     # ── get_files ─────────────────────────────────────────────────────────────
 

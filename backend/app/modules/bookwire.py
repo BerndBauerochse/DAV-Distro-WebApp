@@ -145,6 +145,33 @@ class BookwireModule(BasePortalModule):
             return []
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
+    def supports_cover_exchange(self) -> bool:
+        return bool(self.sftp_host and self.sftp_username)
+
+    def exchange_covers(self, cover_paths: list[str]) -> list[tuple[str, str, str | None]]:
+        """Bookwire nutzt FTPS — Cover in den Cover-Austausch-Ordner bzw. remote_dir."""
+        import ftplib
+        remote_dir = (self.cover_exchange_dir or self.remote_dir or "/").rstrip("/") or "/"
+        results: list[tuple[str, str, str | None]] = []
+        with ftps_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as ftp:
+            if remote_dir != "/":
+                try:
+                    ftp.cwd(remote_dir)
+                except ftplib.error_perm:
+                    try:
+                        ftp.mkd(remote_dir)
+                    except ftplib.error_perm:
+                        pass
+                    ftp.cwd(remote_dir)
+            for path in cover_paths:
+                fname = os.path.basename(path)
+                try:
+                    ftp_upload(ftp, path, fname)
+                    results.append((fname, "success", None))
+                except Exception as e:
+                    results.append((fname, "failed", str(e)))
+        return results
+
     def _prepare_zip(self, src: str, dest: str, ean: str) -> bool:
         """Kopiert ZIP in export_dir. Wenn eine PDF mit gleicher EAN in pdf_dir liegt:
         ZIP entpacken, PDF als {ean}_booklet.pdf einfügen, neu packen.

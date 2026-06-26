@@ -88,6 +88,30 @@ class DivibibModule(BasePortalModule):
             return []
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
+    def exchange_covers(self, cover_paths: list[str]) -> list[tuple[str, str, str | None]]:
+        """Divibib nutzt FTP — Cover in den Cover-Austausch-Ordner bzw. Wurzel."""
+        import ftplib
+        remote_dir = (self.cover_exchange_dir or "/").rstrip("/") or "/"
+        results: list[tuple[str, str, str | None]] = []
+        with ftp_connection(self.host, self.port, self.username, self.password) as ftp:
+            if remote_dir != "/":
+                try:
+                    ftp.cwd(remote_dir)
+                except ftplib.error_perm:
+                    try:
+                        ftp.mkd(remote_dir)
+                    except ftplib.error_perm:
+                        pass
+                    ftp.cwd(remote_dir)
+            for path in cover_paths:
+                fname = os.path.basename(path)
+                try:
+                    ftp_upload(ftp, path, fname)
+                    results.append((fname, "success", None))
+                except Exception as e:
+                    results.append((fname, "failed", str(e)))
+        return results
+
     def _extract_eans(self, xml_path: str) -> list[str]:
         try:
             from lxml import etree

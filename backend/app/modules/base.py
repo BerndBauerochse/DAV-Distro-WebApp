@@ -88,26 +88,36 @@ class BasePortalModule(ABC):
         return True
 
     def supports_cover_exchange(self) -> bool:
-        """True, wenn der Kanal einen Cover-Austausch-Ordner + SFTP-Zugang hat."""
-        return bool(self.cover_exchange_dir and getattr(self, "host", "")
-                    and getattr(self, "username", ""))
+        """True, wenn der Kanal Cover empfangen kann (Standard-SFTP-Zugang).
+        Sonderfälle (Bookwire/FTPS, Divibib/FTP, Google) überschreiben dies."""
+        return bool(getattr(self, "host", "") and getattr(self, "username", ""))
+
+    def _cover_remote_dir(self) -> str:
+        """Zielordner für Cover: spezieller Cover-Austausch-Ordner, sonst der
+        normale Zielordner des Kanals, sonst Wurzel."""
+        d = (self.cover_exchange_dir
+             or getattr(self, "remote_dir", "")
+             or getattr(self, "remote_path", "")
+             or "/")
+        return d.rstrip("/") or "/"
 
     def exchange_covers(self, cover_paths: list[str]) -> list[tuple[str, str, str | None]]:
-        """Lädt die angegebenen Cover-Dateien in den Cover-Austausch-Ordner (SFTP).
+        """Lädt die Cover per Standard-SFTP in den Zielordner.
         Gibt je Datei (dateiname, status, fehler) zurück."""
         from app.modules.ftp_helper import sftp_connection, sftp_upload, sftp_makedirs
 
-        remote_dir = self.cover_exchange_dir.rstrip("/") or "/"
+        remote_dir = self._cover_remote_dir()
         results: list[tuple[str, str, str | None]] = []
         with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
             if remote_dir != "/":
                 sftp_makedirs(sftp, remote_dir)
+            base = "" if remote_dir == "/" else remote_dir
             for path in cover_paths:
                 fname = os.path.basename(path)
                 try:
-                    sftp_upload(sftp, path, f"{remote_dir}/{fname}")
+                    sftp_upload(sftp, path, f"{base}/{fname}")
                     results.append((fname, "success", None))
-                    logger.info("Cover-Austausch: %s → %s%s", fname, self.portal_name, remote_dir)
+                    logger.info("Cover-Austausch: %s → %s %s", fname, self.portal_name, remote_dir)
                 except Exception as e:
                     results.append((fname, "failed", str(e)))
                     logger.error("Cover-Austausch fehlgeschlagen %s → %s: %s", fname, self.portal_name, e)
