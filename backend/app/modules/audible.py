@@ -125,6 +125,10 @@ class AudibleModule(BasePortalModule):
         self.password = _decode_password(config, sec)
         self.remote_path = self._get(sec, "remote_path", "/")
         self.cover_exchange_dir = self._get(sec, "cover_exchange_dir", "")
+        # Serverseitiger Pfad, der in der Cover-Austausch-Mail an Audible genannt wird
+        self.cover_exchange_mail_path = self._get(
+            sec, "cover_exchange_mail_path", "…/ebs_data/deftp_dave/Cover_Austausch"
+        )
         self._mail_draft_data: dict | None = None
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
