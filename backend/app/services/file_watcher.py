@@ -10,7 +10,7 @@ from app.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
-_SUPPORTED = {".xml", ".xlsx", ".xls"}
+_SUPPORTED = {".xml", ".xlsx", ".xls", ".zip"}  # .zip = Storytel-Metadaten (XMLs)
 _POLL_INTERVAL = 3  # seconds
 
 
