@@ -16,6 +16,8 @@ READ_SIZE   = 4 * 1024 * 1024      # 4 MB stream buffer
 CHUNK_TEMP  = Path("/tmp/dav-chunks")
 THUMB_CACHE = Path("/tmp/dav-thumbs")
 THUMB_SIZE  = 200
+MAX_CHUNKS  = 200_000              # Obergrenze gegen DoS (bei 20 MB/Chunk ~ 4 TB)
+MAX_FILE_BYTES = 30 * 1024 * 1024 * 1024  # 30 GB harte Obergrenze pro Datei
 
 STORAGE_ROOT = Path(os.getenv("STORAGE_DIR", "/storage"))
 
@@ -84,6 +86,15 @@ async def upload_chunk(
 ):
     folder = _category_path(category)
     filename = _safe_filename(filename)
+
+    # Grenzen validieren (DoS-Schutz)
+    if total_chunks < 1 or total_chunks > MAX_CHUNKS:
+        raise HTTPException(status_code=400, detail="Ungültige Chunk-Anzahl.")
+    if chunk_index < 0 or chunk_index >= total_chunks:
+        raise HTTPException(status_code=400, detail="Ungültiger Chunk-Index.")
+    if expected_size is not None and (expected_size < 0 or expected_size > MAX_FILE_BYTES):
+        raise HTTPException(status_code=413, detail="Datei zu groß.")
+
     CHUNK_TEMP.mkdir(parents=True, exist_ok=True)
 
     # Stream raw body directly to disk — no buffering, no multipart overhead

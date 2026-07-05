@@ -9,6 +9,10 @@ from app.auth import get_current_user
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+# ~750 KB base64 ≈ 550 KB Bild — großzügig, da Frontend auf 256×256 verkleinert
+MAX_AVATAR_CHARS = 750_000
+
+
 class AvatarBody(BaseModel):
     avatar_data: str  # base64 data-URL
 
@@ -30,6 +34,8 @@ async def set_avatar(
     current_user: str = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if len(body.avatar_data) > MAX_AVATAR_CHARS:
+        raise HTTPException(status_code=413, detail="Avatar-Bild zu groß.")
     settings = await db.get(UserSettings, current_user)
     if settings:
         settings.avatar_data = body.avatar_data

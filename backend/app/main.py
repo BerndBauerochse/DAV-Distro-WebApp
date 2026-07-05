@@ -62,10 +62,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="DAV Distro WebApp", version="1.0.0", lifespan=lifespan)
 
+# CORS: per Env CORS_ORIGINS (kommagetrennt) einschränkbar. Ohne Env → Wildcard,
+# dann aber ohne Credentials (RFC-konform; die App nutzt ohnehin Bearer-Tokens).
+_cors_env = os.getenv("CORS_ORIGINS", "").strip()
+if _cors_env:
+    _cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+    _cors_credentials = True
+else:
+    _cors_origins = ["*"]
+    _cors_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

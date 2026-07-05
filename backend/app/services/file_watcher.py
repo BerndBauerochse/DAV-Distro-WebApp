@@ -33,8 +33,14 @@ async def _watch_loop(folder: Path) -> None:
             logger.warning(f"File watcher error: {e}")
 
 
+# Starke Referenz halten, damit der GC den Task nicht verwirft
+_watcher_tasks: set = set()
+
+
 def start_file_watcher(storage_root: Path) -> None:
     folder = storage_root / "metadata"
     folder.mkdir(parents=True, exist_ok=True)
-    asyncio.create_task(_watch_loop(folder))
+    task = asyncio.create_task(_watch_loop(folder))
+    _watcher_tasks.add(task)
+    task.add_done_callback(_watcher_tasks.discard)
     logger.info(f"File watcher gestartet — überwacht: {folder}")

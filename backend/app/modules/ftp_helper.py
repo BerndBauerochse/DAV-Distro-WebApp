@@ -4,6 +4,7 @@ Shared SFTP/FTP upload helpers with progress callback support.
 import ftplib
 import logging
 import os
+import socket
 from contextlib import contextmanager
 from typing import Callable
 
@@ -13,10 +14,18 @@ logger = logging.getLogger(__name__)
 
 ProgressCb = Callable[[int, int], None]  # (current_bytes, total_bytes)
 
+# Verbindungs-Timeout (Sekunden) — verhindert hängende Requests/Threads bei
+# nicht erreichbaren Gegenstellen.
+CONNECT_TIMEOUT = 30
+
 
 @contextmanager
 def sftp_connection(host: str, port: int, username: str, password: str):
-    transport = paramiko.Transport((host, port))
+    # Socket mit Timeout aufbauen, damit paramiko nicht unbegrenzt blockiert
+    sock = socket.create_connection((host, port), timeout=CONNECT_TIMEOUT)
+    transport = paramiko.Transport(sock)
+    transport.banner_timeout = CONNECT_TIMEOUT
+    transport.auth_timeout = CONNECT_TIMEOUT
     sftp = None
     try:
         transport.connect(username=username, password=password)
@@ -56,7 +65,7 @@ def sftp_upload(
 @contextmanager
 def ftp_connection(host: str, port: int, username: str, password: str):
     ftp = ftplib.FTP()
-    ftp.connect(host, port)
+    ftp.connect(host, port, timeout=CONNECT_TIMEOUT)
     ftp.login(username, password)
     try:
         yield ftp
@@ -87,7 +96,7 @@ def ftps_connection(host: str, port: int, username: str, password: str):
     """FTP with explicit TLS (FTPES) — same as FileZilla Protocol 4.
     Uses TLS session resumption to satisfy servers that require it (522)."""
     ftp = _FTP_TLS_SessionReuse()
-    ftp.connect(host, port)
+    ftp.connect(host, port, timeout=CONNECT_TIMEOUT)
     ftp.login(username, password)
     ftp.prot_p()  # encrypt the data channel
     try:
