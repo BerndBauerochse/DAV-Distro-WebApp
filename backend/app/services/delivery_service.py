@@ -78,6 +78,26 @@ def load_config() -> configparser.ConfigParser:
     return config
 
 
+def _find_corrupt_zips(transfers: list) -> list[str]:
+    """Prüft alle ZIP-Transfers auf Vollständigkeit (lesbares Inhaltsverzeichnis).
+    Eine abgebrochene Übertragung hinterlässt eine ZIP ohne gültiges Central
+    Directory — das fällt hier sofort auf, ohne die ganze Datei zu lesen."""
+    import zipfile
+    bad: list[str] = []
+    for t in transfers:
+        if not (t.file_name or "").lower().endswith(".zip"):
+            continue
+        if not t.source_path or not os.path.isfile(t.source_path):
+            continue
+        try:
+            with zipfile.ZipFile(t.source_path) as zf:
+                zf.namelist()
+        except Exception as e:
+            logger.error("ZIP-Integritätsprüfung fehlgeschlagen für %s: %s", t.file_name, e)
+            bad.append(t.file_name)
+    return bad
+
+
 async def start_delivery_run(
     db_session_factory,
     portal_key: str,
@@ -172,6 +192,17 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
         transfers = module.get_files(str(run_id), metadata_path)
         if takedown:
             transfers = [t for t in transfers if t.file_type == "metadata"]
+
+        # Integritätsprüfung: unvollständig übertragene/beschädigte ZIPs
+        # erkennen, BEVOR sie ans Portal geschickt werden.
+        corrupt = _find_corrupt_zips(transfers)
+        if corrupt:
+            raise RuntimeError(
+                "Folgende ZIP-Dateien sind unvollständig oder beschädigt "
+                "(Upload zum Server prüfen und Datei erneut hochladen): "
+                + ", ".join(corrupt)
+            )
+
         total = len(transfers)
 
         if total == 0:

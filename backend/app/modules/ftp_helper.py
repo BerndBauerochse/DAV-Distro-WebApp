@@ -59,7 +59,21 @@ def sftp_upload(
             progress_cb(sent, total)
 
     sftp.put(local_path, remote_path, callback=_callback)
-    return f"Upload OK: {os.path.basename(local_path)} ({file_size} bytes)"
+
+    # Verifikation: Datei muss auf dem Zielserver in voller Größe liegen
+    try:
+        remote_size = sftp.stat(remote_path).st_size
+    except IOError as e:
+        raise IOError(
+            f"Übertragung nicht bestätigt: {remote_path} ist nach dem Upload "
+            f"nicht auf dem Server auffindbar ({e})"
+        )
+    if remote_size != file_size:
+        raise IOError(
+            f"Übertragung unvollständig: {os.path.basename(local_path)} — "
+            f"{remote_size} von {file_size} Bytes auf dem Server angekommen"
+        )
+    return f"Upload OK (verifiziert): {os.path.basename(local_path)} ({file_size} bytes)"
 
 
 @contextmanager
@@ -144,4 +158,17 @@ def ftp_upload(
     with open(local_path, "rb") as f:
         ftp.storbinary(f"STOR {remote_filename}", f, blocksize=chunk_size, callback=_callback)
 
-    return f"226 Transfer complete: {remote_filename}"
+    # Verifikation: Größe auf dem Zielserver abfragen (SIZE-Kommando).
+    # Nicht jeder FTP-Server unterstützt SIZE — dann nur Warnung statt Fehler.
+    try:
+        remote_size = ftp.size(remote_filename)
+    except ftplib.all_errors as e:
+        logger.warning("FTP SIZE-Prüfung nicht möglich für %s: %s", remote_filename, e)
+        remote_size = None
+    if remote_size is not None and remote_size != file_size:
+        raise IOError(
+            f"Übertragung unvollständig: {remote_filename} — "
+            f"{remote_size} von {file_size} Bytes auf dem Server angekommen"
+        )
+
+    return f"226 Transfer complete (verifiziert): {remote_filename}"
