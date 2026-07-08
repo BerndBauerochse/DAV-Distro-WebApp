@@ -16,36 +16,23 @@ interface Props {
  * Harte Zeilenumbrüche werden als CRLF erhalten, Nicht-ASCII (Umlaute) als =XX
  * kodiert, Zeilen auf max. 76 Zeichen mit Soft-Breaks (=) umgebrochen.
  */
-function encodeQuotedPrintable(input: string): string {
-  const bytes = new TextEncoder().encode(input.replace(/\r\n/g, '\n').replace(/\r/g, '\n'))
-  const lines: string[] = []
-  let line = ''
-  const flushSoft = () => { lines.push(line + '='); line = '' }
-
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i]
-    if (b === 0x0a) {            // harter Zeilenumbruch
-      // evtl. trailing space/tab am Zeilenende kodieren
-      if (line.endsWith(' ') || line.endsWith('\t')) {
-        const c = line.slice(-1)
-        line = line.slice(0, -1) + '=' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')
-      }
-      lines.push(line); line = ''
-      continue
-    }
-    let token: string
-    if (b === 0x3d) {                                   // '='
-      token = '=3D'
-    } else if ((b >= 0x21 && b <= 0x7e) || b === 0x20 || b === 0x09) {
-      token = String.fromCharCode(b)                    // druckbares ASCII, Space, Tab
-    } else {
-      token = '=' + b.toString(16).toUpperCase().padStart(2, '0')
-    }
-    if (line.length + token.length > 75) flushSoft()
-    line += token
-  }
-  if (line.length > 0) lines.push(line)
-  return lines.join('\r\n')
+/**
+ * Outlook übernimmt beim Öffnen von .eml-Entwürfen (X-Unsent) nur HTML-Bodies
+ * zuverlässig — Klartext-Teile gehen verloren (beobachtet bei Zebra- und
+ * Update-Mails). Daher wird JEDER Body als HTML eingebettet; Klartext wird
+ * hier in schlichtes HTML umgewandelt (escaped, Zeilenumbrüche → <br>).
+ */
+function toHtmlBody(body: string, isHtml: boolean | undefined): string {
+  if (isHtml) return body
+  const escaped = body
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  return (
+    '<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#000000;">'
+    + escaped.replace(/\r?\n/g, '<br>')
+    + '</div>'
+  )
 }
 
 export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: Props) {
@@ -56,10 +43,9 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
     setLoading(true)
     setAttachmentError('')
     try {
-    const bodyType = draft.is_html ? 'text/html' : 'text/plain'
-    // Body als quoted-printable kodieren — überträgt Umlaute korrekt und wird
-    // von Outlook zuverlässig gerendert (im Gegensatz zu rohem 8-bit/base64).
-    const bodyQP = encodeQuotedPrintable(draft.body)
+    // Body immer als HTML einbetten — der einzige Pfad, den Outlook beim
+    // Öffnen von X-Unsent-Entwürfen nachweislich zuverlässig übernimmt.
+    const htmlBody = toHtmlBody(draft.body, draft.is_html)
     let eml: string
 
     if (draft.attachment) {
@@ -90,10 +76,9 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
         `Content-Type: multipart/mixed; boundary="${boundary}"`,
         '',
         `--${boundary}`,
-        `Content-Type: ${bodyType}; charset=utf-8`,
-        'Content-Transfer-Encoding: quoted-printable',
+        'Content-Type: text/html; charset=utf-8',
         '',
-        bodyQP,
+        htmlBody,
         '',
         `--${boundary}`,
         'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -105,16 +90,16 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
         `--${boundary}--`,
       ].join('\r\n')
     } else {
-      // Single-part EML
+      // Single-part EML (identisch zum von Anfang an funktionierenden
+      // Audible-HTML-Pfad: Body inline, ohne Transfer-Kodierung)
       eml = [
         'MIME-Version: 1.0',
         'X-Unsent: 1',
         `To: ${draft.to}`,
         `Subject: ${draft.subject}`,
-        `Content-Type: ${bodyType}; charset=utf-8`,
-        'Content-Transfer-Encoding: quoted-printable',
+        'Content-Type: text/html; charset=utf-8',
         '',
-        bodyQP,
+        htmlBody,
       ].join('\r\n')
     }
 
