@@ -218,8 +218,10 @@ class AudibleModule(BasePortalModule):
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
     def get_mail_draft(self, user: str | None = None) -> dict | None:
-        # Update-Lauf: Change-Request-Mail statt der normalen Delivery-Mail
+        # Update-Lauf: Change-Request- bzw. Takedown-Mail statt der Delivery-Mail
         if self.update_field and self._meta_file:
+            if self.update_field == "Takedown":
+                return self._build_takedown_mail(user)
             return self._build_update_mail()
         if not self._mail_draft_data:
             return None
@@ -234,6 +236,65 @@ class AudibleModule(BasePortalModule):
         "Author":   ["Author First Name", "Author Middle Name", "Author Last Name"],
         "Narrator": ["Narrator First Name", "Narrator Middle Name", "Narrator Last Name"],
     }
+
+    def _read_ean_title_rows(self) -> list[tuple[str, str]]:
+        """Liest (EAN, Titel) aller Zeilen aus der Metadatei."""
+        df = pd.read_excel(self._meta_file, dtype=str)
+        isbn_col = _find_col(df, [_AUDIBLE_ISBN_COL, "EAN", "ISBN"])
+        title_col = _find_col(df, ["Title", "title"])
+        if not isbn_col:
+            logger.error("Audible: ISBN-Spalte nicht gefunden")
+            return []
+        rows: list[tuple[str, str]] = []
+        for _, row in df.iterrows():
+            ean = str(row.get(isbn_col, "")).strip()
+            if not ean or ean == "nan":
+                continue
+            title = str(row.get(title_col, "")).strip() if title_col else ""
+            rows.append((ean, "" if title == "nan" else title))
+        return rows
+
+    def _build_takedown_mail(self, user: str | None = None) -> dict | None:
+        """Takedown-Mail: alle Titel der Metadatei als Tabelle, Empfänger wie
+        in der bisherigen Praxis (To: eigene Adresse, Bcc: Portale)."""
+        try:
+            rows = self._read_ean_title_rows()
+            if not rows:
+                return None
+
+            table = _outlook_table(pd.DataFrame({
+                "Unique identifier (ISBN/EAN)": [e for e, _ in rows],
+                "Title": [t for _, t in rows],
+            }))
+            phrase = "this title" if len(rows) == 1 else "these titles"
+            name = user.capitalize() if user else "Bernd"
+
+            body = (
+                '<div style="font-family:Arial,sans-serif;font-size:13px;color:#000000;">'
+                "<p>Categories: Takedown</p>"
+                "<p>Hello,</p>"
+                f"<p>can you please remove {phrase} from the program as soon as possible:</p>"
+                f"{table}"
+                "<p>Please send me a confirmation that you are processing the takedown.</p>"
+                f"<p>Thank you.<br>{name}</p>"
+                "</div>"
+            )
+
+            sec = "Portal_Audible"
+            return {
+                "to": self._get(sec, "takedown_mail_to", "Bauerochse@der-audio-verlag.de"),
+                "bcc": self._get(
+                    sec, "takedown_mail_bcc",
+                    "content-operations-audiobook@zebralution.com; "
+                    "eu-delivery@audible.de; kurzke@audible.de",
+                ),
+                "subject": "Der Audio Verlag - Takedown",
+                "body": body,
+                "is_html": True,
+            }
+        except Exception as e:
+            logger.error(f"Audible Takedown-Mail konnte nicht erstellt werden: {e}")
+            return None
 
     def _build_update_mail(self) -> dict | None:
         """Baut die '[change request] Metadata change'-Mail automatisch aus

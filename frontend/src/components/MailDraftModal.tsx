@@ -72,6 +72,7 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
         'MIME-Version: 1.0',
         'X-Unsent: 1',
         `To: ${draft.to}`,
+        ...(draft.bcc ? [`Bcc: ${draft.bcc}`] : []),
         `Subject: ${draft.subject}`,
         `Content-Type: multipart/mixed; boundary="${boundary}"`,
         '',
@@ -96,6 +97,7 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
         'MIME-Version: 1.0',
         'X-Unsent: 1',
         `To: ${draft.to}`,
+        ...(draft.bcc ? [`Bcc: ${draft.bcc}`] : []),
         `Subject: ${draft.subject}`,
         'Content-Type: text/html; charset=utf-8',
         '',
@@ -160,6 +162,13 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>An</p>
             <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.to}</p>
           </div>
+          {draft.bcc && (
+            <div className="rounded-xl p-3 space-y-1"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-300)' }}>Bcc</p>
+              <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.bcc}</p>
+            </div>
+          )}
           <div className="rounded-xl p-3 space-y-1"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>Betreff</p>

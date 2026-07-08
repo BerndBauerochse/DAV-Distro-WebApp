@@ -28,6 +28,8 @@ interface Props {
 
 // Metadatenfelder, die per Audible-Update-Mail gemeldet werden können.
 // Author und Narrator fassen jeweils First/Middle/Last Name zusammen.
+// "Takedown" erzeugt statt der Change-Request- eine Takedown-Mail
+// (alle Titel der Metadatei als Tabelle).
 const AUDIBLE_UPDATE_FIELDS = [
   'Title',
   'Subtitle',
@@ -35,6 +37,7 @@ const AUDIBLE_UPDATE_FIELDS = [
   'Narrator',
   'Book Description',
   'Audiobook Pub Date (mm/dd/yyyy)',
+  'Takedown',
 ] as const
 
 function AbridgedBadge({ abridged }: { abridged: boolean | null }) {

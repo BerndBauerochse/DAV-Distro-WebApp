@@ -213,7 +213,7 @@ function RunRow({ run, portalName, catalog, expanded, onToggle, onDelete, onCanc
             {run.takedown && (
               <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
                 style={{ background: 'rgba(251,146,60,0.18)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.35)' }}>
-                Takedown
+                Update
               </span>
             )}
           </div>

@@ -71,6 +71,7 @@ export interface BatchPreview {
 
 export interface MailDraft {
   to: string
+  bcc?: string
   subject: string
   body: string
   is_html?: boolean
