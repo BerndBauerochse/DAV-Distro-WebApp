@@ -26,16 +26,13 @@ interface Props {
   isStarting: boolean
 }
 
-// Metadatenfelder, die per Audible-Update-Mail gemeldet werden können
+// Metadatenfelder, die per Audible-Update-Mail gemeldet werden können.
+// Author und Narrator fassen jeweils First/Middle/Last Name zusammen.
 const AUDIBLE_UPDATE_FIELDS = [
   'Title',
   'Subtitle',
-  'Author First Name',
-  'Author Middle Name',
-  'Author Last Name',
-  'Narrator First Name',
-  'Narrator Middle Name',
-  'Narrator Last Name',
+  'Author',
+  'Narrator',
   'Book Description',
   'Audiobook Pub Date (mm/dd/yyyy)',
 ] as const

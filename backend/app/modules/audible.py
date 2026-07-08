@@ -228,6 +228,13 @@ class AudibleModule(BasePortalModule):
         draft["body"] = draft.get("body", "").replace("__USER__", name)
         return draft
 
+    # Auswahloptionen, die mehrere Excel-Spalten zusammenfassen:
+    # Author/Narrator werden immer als First + Middle + Last Name behandelt.
+    _COMBINED_UPDATE_FIELDS = {
+        "Author":   ["Author First Name", "Author Middle Name", "Author Last Name"],
+        "Narrator": ["Narrator First Name", "Narrator Middle Name", "Narrator Last Name"],
+    }
+
     def _build_update_mail(self) -> dict | None:
         """Baut die '[change request] Metadata change'-Mail automatisch aus
         ISBN, Titel, Feldname und dem neuen Feldwert aus der Excel.
@@ -236,29 +243,41 @@ class AudibleModule(BasePortalModule):
             df = pd.read_excel(self._meta_file, dtype=str)
             isbn_col = _find_col(df, [_AUDIBLE_ISBN_COL, "EAN", "ISBN"])
             title_col = _find_col(df, ["Title", "title"])
-            value_col = _find_col(df, [self.update_field])
             if not isbn_col:
                 logger.error("Audible Update: ISBN-Spalte nicht gefunden")
                 return None
-            if not value_col:
-                logger.error("Audible Update: Spalte '%s' nicht in Excel gefunden", self.update_field)
-                return None
+
+            combined = self._COMBINED_UPDATE_FIELDS.get(self.update_field)
+            if combined:
+                value_cols = [c for c in (_find_col(df, [name]) for name in combined) if c]
+                if not value_cols:
+                    logger.error("Audible Update: Keine der Spalten %s in Excel gefunden", combined)
+                    return None
+            else:
+                value_col = _find_col(df, [self.update_field])
+                if not value_col:
+                    logger.error("Audible Update: Spalte '%s' nicht in Excel gefunden", self.update_field)
+                    return None
+                value_cols = [value_col]
 
             # Anzeigename ohne Format-Suffix, z.B. "Audiobook Pub Date"
             field_display = self.update_field
             for suffix in (" (mm/dd/yyyy)", " (MM/DD/YYYY)"):
                 field_display = field_display.replace(suffix, "")
 
+            def _cell(row, col) -> str:
+                v = str(row.get(col, "")).strip()
+                return "" if v == "nan" else v
+
             entries: list[tuple[str, str, str]] = []
             for _, row in df.iterrows():
-                ean = str(row.get(isbn_col, "")).strip()
-                if not ean or ean == "nan":
+                ean = _cell(row, isbn_col)
+                if not ean:
                     continue
-                title = str(row.get(title_col, "")).strip() if title_col else ""
-                value = str(row.get(value_col, "")).strip()
-                if value == "nan":
-                    value = ""
-                entries.append((ean, title if title != "nan" else "", value))
+                title = _cell(row, title_col) if title_col else ""
+                # Bei Author/Narrator alle Namensteile zu einem Wert verbinden
+                value = " ".join(p for p in (_cell(row, c) for c in value_cols) if p)
+                entries.append((ean, title, value))
 
             if not entries:
                 return None
