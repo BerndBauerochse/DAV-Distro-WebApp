@@ -21,10 +21,24 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
 
 interface Props {
   preview: BatchPreview
-  onStart: (portal: string, takedown: boolean) => void
+  onStart: (portal: string, takedown: boolean, updateField?: string) => void
   onRemove: () => void
   isStarting: boolean
 }
+
+// Metadatenfelder, die per Audible-Update-Mail gemeldet werden können
+const AUDIBLE_UPDATE_FIELDS = [
+  'Title',
+  'Subtitle',
+  'Author First Name',
+  'Author Middle Name',
+  'Author Last Name',
+  'Narrator First Name',
+  'Narrator Middle Name',
+  'Narrator Last Name',
+  'Book Description',
+  'Audiobook Pub Date (mm/dd/yyyy)',
+] as const
 
 function AbridgedBadge({ abridged }: { abridged: boolean | null }) {
   if (abridged === null) return null
@@ -45,8 +59,10 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
     preview.portal_variants[0]?.key ?? preview.detected_portal
   )
   const [takedown, setTakedown] = useState(false)
+  const [updateField, setUpdateField] = useState<string>(AUDIBLE_UPDATE_FIELDS[0])
 
   const isMoA        = selectedPortal.endsWith('_moa')
+  const isAudibleUpdate = takedown && selectedPortal === 'audible'
   const missingCount = preview.books.filter(b => isMoA ? !b.cover_available : !b.zip_available).length
   const totalCount   = preview.books.length
   const colors       = PORTAL_COLORS[selectedPortal] ?? PORTAL_COLORS.unknown
@@ -89,10 +105,10 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
               {missingCount} {fileLabel} fehlt{missingCount > 1 ? 'en' : ''}
             </span>
           )}
-          {/* Takedown toggle */}
+          {/* Update toggle (ehem. Takedown): nur Metadaten senden */}
           <button
             onClick={() => setTakedown(v => !v)}
-            title="Takedown: nur Metadaten senden"
+            title="Update: nur Metadaten senden (ohne Cover und Audiodaten)"
             className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-medium transition-colors"
             style={takedown
               ? { background: 'rgba(251,146,60,0.2)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)' }
@@ -100,16 +116,16 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
             }
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            Takedown
+            Update
           </button>
           <button
-            onClick={() => onStart(selectedPortal, takedown)}
+            onClick={() => onStart(selectedPortal, takedown, isAudibleUpdate ? updateField : undefined)}
             disabled={isStarting || totalCount === 0}
             className="btn-accent flex items-center gap-1.5 py-1.5 px-3"
             style={takedown ? { background: 'rgba(251,146,60,0.8)' } : {}}
           >
             {isStarting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            {takedown ? 'Takedown' : 'Starten'}
+            {takedown ? 'Update' : 'Starten'}
           </button>
           <button
             onClick={onRemove}
@@ -123,6 +139,28 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
           </button>
         </div>
       </div>
+
+      {/* Audible-Update: Auswahl des geänderten Metadatenfelds für die Change-Request-Mail */}
+      {isAudibleUpdate && (
+        <div className="flex items-center gap-3 px-5 py-2.5"
+          style={{ borderBottom: '1px solid var(--glass-border)', background: 'rgba(251,146,60,0.06)' }}>
+          <span className="text-xs font-medium whitespace-nowrap" style={{ color: '#fb923c' }}>
+            Metadatenfeld für Audible-Update:
+          </span>
+          <select
+            value={updateField}
+            onChange={e => setUpdateField(e.target.value)}
+            className="glass-select text-xs py-1"
+          >
+            {AUDIBLE_UPDATE_FIELDS.map(f => (
+              <option key={f} value={f} style={{ background: '#101830' }}>{f}</option>
+            ))}
+          </select>
+          <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
+            Der neue Wert wird aus der Metadatei gelesen und in die Mail eingesetzt
+          </span>
+        </div>
+      )}
 
       {/* Book list */}
       {preview.books.length === 0 ? (

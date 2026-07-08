@@ -257,6 +257,7 @@ async def start_run(
     metadata_file: UploadFile | None = File(default=None),
     metadata_server_file: str | None = Form(default=None),
     takedown: bool = Form(default=False),
+    update_field: str | None = Form(default=None),
     current_user: str = Depends(get_current_user),
 ):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -281,7 +282,8 @@ async def start_run(
         metadata_path = dest
 
     run_id = await start_delivery_run(
-        AsyncSessionLocal, portal, metadata_filename, metadata_path, current_user, takedown
+        AsyncSessionLocal, portal, metadata_filename, metadata_path, current_user,
+        takedown, update_field,
     )
     return {"run_id": str(run_id)}
 

@@ -126,14 +126,14 @@ export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function Batch
     setBatches(prev => prev.filter(b => b.id !== id))
   }
 
-  async function handleStart(id: string, portal: string, takedown = false) {
+  async function handleStart(id: string, portal: string, takedown = false, updateField?: string) {
     const batch = batches.find(b => b.id === id)
     if (!batch) return
     setStartingIds(prev => new Set(prev).add(id))
     try {
       const { run_id } = batch.serverFilename
-        ? await api.startRunByServerFile(portal, batch.serverFilename, takedown)
-        : await api.startRun(portal, batch.file ?? undefined, takedown)
+        ? await api.startRunByServerFile(portal, batch.serverFilename, takedown, updateField)
+        : await api.startRun(portal, batch.file ?? undefined, takedown, updateField)
       onStarted(run_id)
       setBatches(prev => prev.filter(b => b.id !== id))
     } catch (err) {
@@ -241,7 +241,7 @@ export const BatchBuilder = forwardRef<BatchBuilderHandle, Props>(function Batch
                 key={batch.id}
                 preview={batch.preview}
                 isStarting={startingIds.has(batch.id)}
-                onStart={(portal, takedown) => handleStart(batch.id, portal, takedown)}
+                onStart={(portal, takedown, updateField) => handleStart(batch.id, portal, takedown, updateField)}
                 onRemove={() => handleRemove(batch.id)}
               />
             )

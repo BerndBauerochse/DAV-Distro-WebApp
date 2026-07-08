@@ -46,6 +46,10 @@ class BasePortalModule(ABC):
     # Subklassen setzen dies aus der Config, wenn der Kanal das unterstützt.
     cover_exchange_dir: str = ""
 
+    # Bei Update-Läufen (ehem. Takedown): welches Metadatenfeld geändert wurde.
+    # Wird von delivery_service gesetzt; aktuell nur von Audible ausgewertet.
+    update_field: str | None = None
+
     def __init__(self, config: configparser.ConfigParser, portal_name: str):
         self.config = config
         self.portal_name = portal_name

@@ -130,6 +130,7 @@ class AudibleModule(BasePortalModule):
             sec, "cover_exchange_mail_path", "…/ebs_data/deftp_dave/Cover_Austausch"
         )
         self._mail_draft_data: dict | None = None
+        self._meta_file: str | None = None
 
     def get_files(self, run_id: str, metadata_path: str | None) -> list[FileTransfer]:
         os.makedirs(self.export_dir, exist_ok=True)
@@ -155,6 +156,7 @@ class AudibleModule(BasePortalModule):
             file_size_bytes=os.path.getsize(meta_file),
         ))
 
+        self._meta_file = meta_file
         eans = self._extract_eans_from_excel(meta_file)
         logger.info(f"Audible: {len(eans)} EANs in Excel gefunden")
 
@@ -216,12 +218,69 @@ class AudibleModule(BasePortalModule):
         return [e for e in eans if not os.path.isfile(os.path.join(self.source_dir, f"{e}.zip"))]
 
     def get_mail_draft(self, user: str | None = None) -> dict | None:
+        # Update-Lauf: Change-Request-Mail statt der normalen Delivery-Mail
+        if self.update_field and self._meta_file:
+            return self._build_update_mail()
         if not self._mail_draft_data:
             return None
         name = user.capitalize() if user else "Bernd"
         draft = dict(self._mail_draft_data)
         draft["body"] = draft.get("body", "").replace("__USER__", name)
         return draft
+
+    def _build_update_mail(self) -> dict | None:
+        """Baut die '[change request] Metadata change'-Mail automatisch aus
+        ISBN, Titel, Feldname und dem neuen Feldwert aus der Excel.
+        Old Value bleibt zum Ausfüllen in Outlook frei (steht nirgends im System)."""
+        try:
+            df = pd.read_excel(self._meta_file, dtype=str)
+            isbn_col = _find_col(df, [_AUDIBLE_ISBN_COL, "EAN", "ISBN"])
+            title_col = _find_col(df, ["Title", "title"])
+            value_col = _find_col(df, [self.update_field])
+            if not isbn_col:
+                logger.error("Audible Update: ISBN-Spalte nicht gefunden")
+                return None
+            if not value_col:
+                logger.error("Audible Update: Spalte '%s' nicht in Excel gefunden", self.update_field)
+                return None
+
+            # Anzeigename ohne Format-Suffix, z.B. "Audiobook Pub Date"
+            field_display = self.update_field
+            for suffix in (" (mm/dd/yyyy)", " (MM/DD/YYYY)"):
+                field_display = field_display.replace(suffix, "")
+
+            entries: list[tuple[str, str, str]] = []
+            for _, row in df.iterrows():
+                ean = str(row.get(isbn_col, "")).strip()
+                if not ean or ean == "nan":
+                    continue
+                title = str(row.get(title_col, "")).strip() if title_col else ""
+                value = str(row.get(value_col, "")).strip()
+                if value == "nan":
+                    value = ""
+                entries.append((ean, title if title != "nan" else "", value))
+
+            if not entries:
+                return None
+
+            lines = [
+                f"{ean} | {title} | {field_display} | Old Value:  | New Value: {value}"
+                for ean, title, value in entries
+            ]
+            if len(entries) == 1:
+                subject = f"[change request] Metadata change - {entries[0][1] or entries[0][0]} - {entries[0][0]}"
+            else:
+                subject = f"[change request] Metadata change - {len(entries)} Titel"
+
+            return {
+                "to": "eu-delivery@audible.de; kurzke@audible.de",
+                "subject": subject,
+                "body": "\n\n".join(lines),
+                "is_html": False,
+            }
+        except Exception as e:
+            logger.error(f"Audible Update-Mail konnte nicht erstellt werden: {e}")
+            return None
 
     # ------------------------------------------------------------------ helpers
 
