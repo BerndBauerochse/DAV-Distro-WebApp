@@ -208,6 +208,12 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
         total = len(transfers)
 
+        # Für die Historie: Ziel & Größe je Datei aus den Transfers nachschlagen
+        transfer_info = {
+            (t.ean, t.file_name): (t.destination, t.file_size_bytes)
+            for t in transfers
+        }
+
         if total == 0:
             raise RuntimeError(
                 "Keine Dateien gefunden. Bitte XML-Datei und Quellverzeichnis prüfen."
@@ -280,12 +286,15 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
             # thousands of rows per file (one per SFTP chunk), causing a massive
             # DB flush that blocks the event loop and delays the final WS message.
             if status in ("success", "failed", "skipped"):
+                dest, size = transfer_info.get((ean, file_name), (None, None))
                 log_records.append({
                     "run_id": uuid.UUID(run_id),
                     "portal": portal_key,
                     "ean": ean,
                     "file_type": file_type,
                     "file_name": file_name,
+                    "destination": dest,
+                    "file_size_bytes": total_bytes or size,
                     "status": status,
                     "error_log": error,
                     "finished_at": datetime.now(timezone.utc),
