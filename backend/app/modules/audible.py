@@ -254,6 +254,59 @@ class AudibleModule(BasePortalModule):
             rows.append((ean, "" if title == "nan" else title))
         return rows
 
+    def upload_toc_files_to_corr(self, toc_paths: list[str]) -> list[tuple[str, str | None, str, str | None]]:
+        """Lädt TOC-Dateien einzeln in die jeweiligen /{ISBN}_corr/-Ordner auf
+        dem Audible-SFTP. Die ISBN wird aus dem Dateinamen gelesen.
+        Rückgabe je Datei: (dateiname, ean, status, fehler)."""
+        import re
+        from app.modules.ftp_helper import sftp_connection, sftp_upload
+
+        results: list[tuple[str, str | None, str, str | None]] = []
+        with sftp_connection(self.host, self.port, self.username, self.password) as sftp:
+            for path in toc_paths:
+                fname = os.path.basename(path)
+                m = re.search(r"(\d{13})", fname)
+                if not m:
+                    results.append((fname, None, "failed", "Keine ISBN im Dateinamen erkennbar"))
+                    continue
+                ean = m.group(1)
+                folder = f"/{ean}_corr"
+                try:
+                    try:
+                        sftp.stat(folder)
+                    except IOError:
+                        sftp.mkdir(folder)
+                    sftp_upload(sftp, path, f"{folder}/{fname}")
+                    results.append((fname, ean, "success", None))
+                    logger.info("Audible TOC-Update: %s → %s/", fname, folder)
+                except Exception as e:
+                    results.append((fname, ean, "failed", str(e)))
+                    logger.error("Audible TOC-Update fehlgeschlagen für %s: %s", fname, e)
+        return results
+
+    def build_toc_update_mail(self, entries: list[tuple[str, str]], titles: dict[str, str]) -> dict:
+        """Update-Mail für hochgeladene TOC-Dateien — analog zur
+        Metadaten-Update-Mail. entries: list[(dateiname, ean)]."""
+        base_path = self._get("Portal_Audible", "corr_mail_path", "…/ebs_data/deftp_dave")
+        lines = [f"{ean} | {titles.get(ean, '')}" for _, ean in entries]
+        if len(entries) == 1:
+            ean = entries[0][1]
+            subject = f"[change request] TOC UPDATE - {titles.get(ean) or ean} - {ean}"
+        else:
+            subject = f"[change request] TOC UPDATE - {len(entries)} Titel"
+        body = (
+            "\n".join(lines)
+            + "\n\nPlease replace the ToC for the audiobook(s) listed above. "
+            + "The updated ToC files have been uploaded to the corresponding "
+            + f"correction folders on the FTP server: {base_path.rstrip('/')}/<ISBN>_corr/"
+        )
+        return {
+            "to": "eu-delivery@audible.de; kurzke@audible.de",
+            "subject": subject,
+            "body": body,
+            "is_html": False,
+        }
+
     def _build_takedown_mail(self, user: str | None = None) -> dict | None:
         """Takedown-Mail: alle Titel der Metadatei als Tabelle, Empfänger wie
         in der bisherigen Praxis (To: eigene Adresse, Bcc: Portale)."""

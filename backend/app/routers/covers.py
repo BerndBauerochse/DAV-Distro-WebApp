@@ -100,34 +100,36 @@ def _zebra_mail(module, filenames: list[str], user: str | None) -> dict:
     }
 
 
-async def _record_run(portal_key: str, user: str | None,
-                      covers: list[tuple[str, str, str | None]],
-                      mail_draft: dict | None) -> None:
-    """Legt einen abgeschlossenen Run + Cover-Logs an und broadcastet ihn."""
+async def record_exchange_run(portal_key: str, user: str | None,
+                              entries: list[tuple[str, str | None, str, str | None]],
+                              mail_draft: dict | None,
+                              file_type: str = "cover") -> None:
+    """Legt einen abgeschlossenen Run + Datei-Logs an und broadcastet ihn.
+    entries: list[(dateiname, ean, status, fehler)]."""
     run_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
-    completed = sum(1 for _, s, _ in covers if s == "success")
-    failed = len(covers) - completed
+    completed = sum(1 for _, _, s, _ in entries if s == "success")
+    failed = len(entries) - completed
 
     async with AsyncSessionLocal() as db:
         db.add(DeliveryRun(
             id=run_id, portal=portal_key, metadata_filename=None,
             initiated_by=user, status="completed",
-            total_files=len(covers), completed_files=completed,
+            total_files=len(entries), completed_files=completed,
             failed_files=failed, skipped_files=0,
             started_at=now, finished_at=now, mail_draft=mail_draft,
         ))
-        for fname, status, error in covers:
+        for fname, ean, status, error in entries:
             db.add(DeliveryLog(
-                run_id=run_id, portal=portal_key, ean=_ean_of(fname),
-                file_type="cover", file_name=fname,
+                run_id=run_id, portal=portal_key, ean=ean,
+                file_type=file_type, file_name=fname,
                 destination=None, status=status, error_log=error, finished_at=now,
             ))
         await db.commit()
 
     msg = {
         "type": "run_update", "run_id": str(run_id), "portal": portal_key,
-        "status": "completed", "total_files": len(covers),
+        "status": "completed", "total_files": len(entries),
         "completed_files": completed, "failed_files": failed, "skipped_files": 0,
         "initiated_by": user,
     }
@@ -186,16 +188,16 @@ async def exchange_covers(req: ExchangeRequest, user: str = Depends(get_current_
         ok_files = [fname for fname, status, _ in res if status == "success"]
 
         # Historie + Mail
+        entries = [(fname, _ean_of(fname), status, error) for fname, status, error in res]
         if key == "audible":
             # Pro erfolgreichem Cover ein eigener Run + eigene Mail
-            for fname, status, error in res:
-                ean = _ean_of(fname)
+            for fname, ean, status, error in entries:
                 mail = _audible_mail(module, ean, titles.get(ean, ""), user) if status == "success" else None
-                await _record_run(key, user, [(fname, status, error)], mail)
+                await record_exchange_run(key, user, [(fname, ean, status, error)], mail)
         elif key == "zebra":
             mail = _zebra_mail(module, ok_files, user) if ok_files else None
-            await _record_run(key, user, res, mail)
+            await record_exchange_run(key, user, entries, mail)
         else:
-            await _record_run(key, user, res, None)
+            await record_exchange_run(key, user, entries, None)
 
     return {"results": results}

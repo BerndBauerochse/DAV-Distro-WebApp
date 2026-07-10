@@ -145,6 +145,16 @@ export const api = {
     })
   },
 
+  updateTocAtAudible(filenames: string[]): Promise<{
+    results: { filename: string; ean: string | null; status: string; error: string | null }[]
+  }> {
+    return request('/toc/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filenames }),
+    })
+  },
+
   syncCatalog(): Promise<{ synced: number }> {
     return request('/catalog/sync', { method: 'POST' })
   },

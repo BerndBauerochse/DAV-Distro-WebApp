@@ -149,6 +149,23 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
     setExchangeTargets(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
   }
 
+  // TOC-Update: ausgewählte TOC-Dateien in die {ISBN}_corr-Ordner bei Audible laden
+  const tocUpdateMutation = useMutation({
+    mutationFn: (filenames: string[]) => api.updateTocAtAudible(filenames),
+    onSuccess: (data) => {
+      const failed = data.results.filter(r => r.status !== 'success')
+      const ok = data.results.length - failed.length
+      if (failed.length === 0) {
+        alert(`TOC-Update erfolgreich: ${ok} Datei(en) in die jeweiligen Korrekturordner geladen. Die Update-Mail wurde erzeugt.`)
+      } else {
+        const lines = failed.map(r => `• ${r.filename}: ${r.error ?? 'Fehler'}`)
+        alert(`TOC-Update teils fehlgeschlagen.\nErfolgreich: ${ok}\n\nFehler:\n${lines.join('\n')}`)
+      }
+      setSelected(new Set())
+    },
+    onError: (err) => alert(`TOC-Update fehlgeschlagen: ${(err as Error).message}`),
+  })
+
   function handleFiles(fl: FileList | null) {
     if (!fl) return
     Array.from(fl).forEach(file => startUpload(category.key, file, () => {
@@ -286,6 +303,30 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
           </button>
         )}
       </div>
+
+      {/* TOC-Update — ausgewählte TOCs in die {ISBN}_corr-Ordner bei Audible laden */}
+      {category.key === 'toc' && selected.size > 0 && (
+        <div className="rounded-xl p-3"
+          style={{ background: 'rgba(251,146,60,0.05)', border: '1px solid rgba(251,146,60,0.2)' }}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="section-label">TOC-Update an Audible</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Jede Datei wird in ihren Korrekturordner /&#123;ISBN&#125;_corr/ geladen; danach wird die Update-Mail erzeugt
+            </span>
+            <button
+              onClick={() => tocUpdateMutation.mutate([...selected])}
+              disabled={tocUpdateMutation.isPending}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl disabled:opacity-40 transition-colors"
+              style={{ background: '#c2610c', color: '#ffffff', border: '1px solid #ea7317' }}
+            >
+              {tocUpdateMutation.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Sendet…</>
+                : <><Send className="w-3 h-3" /> {selected.size} TOC(s) als Update senden</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Cover-Austausch — Kanäle wählen + ausgewählte Cover versenden */}
       {isCovers && selected.size > 0 && exchangePortals.length > 0 && (
