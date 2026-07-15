@@ -107,6 +107,8 @@ class GoogleModule(BasePortalModule):
             if processed_zip is None:
                 continue
 
+            cover_swapped = self._swap_cover_in_zip(processed_zip, ean)
+
             transfers.append(FileTransfer(
                 ean=ean,
                 file_name=f"{ean}.zip",
@@ -114,6 +116,7 @@ class GoogleModule(BasePortalModule):
                 source_path=processed_zip,
                 destination=f"/{ean}.zip",
                 file_size_bytes=os.path.getsize(processed_zip),
+                injected_files=[(f"{ean}.jpg", "cover")] if cover_swapped else [],
             ))
 
         return transfers

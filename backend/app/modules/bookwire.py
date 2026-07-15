@@ -77,6 +77,7 @@ class BookwireModule(BasePortalModule):
             # Copy/transform to export dir
             zip_dest = os.path.join(self.export_dir, f"{ean}.zip")
             pdf_injected = self._prepare_zip(zip_src, zip_dest, ean)
+            cover_swapped = self._swap_cover_in_zip(zip_dest, ean)
 
             transfers.append(FileTransfer(
                 ean=ean,
@@ -85,7 +86,10 @@ class BookwireModule(BasePortalModule):
                 source_path=zip_dest,
                 destination=f"{self.remote_dir}/{ean}.zip",
                 file_size_bytes=os.path.getsize(zip_dest),
-                injected_files=[(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [],
+                injected_files=(
+                    ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else []) +
+                    ([(f"{ean}.jpg", "cover")] if cover_swapped else [])
+                ),
             ))
 
         return transfers

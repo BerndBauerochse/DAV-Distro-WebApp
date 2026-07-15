@@ -90,6 +90,21 @@ class StorytelModule(BasePortalModule):
                     dst = os.path.join(target, fname)
                     shutil.copy2(src, dst)
 
+        # App-Cover hat Vorrang: liegt in der App ein Cover {ean}.jpg, ersetzt es
+        # das aus der Master-ZIP entpackte (ggf. veraltete) Cover. Das aus der ZIP
+        # entpackte EAN-Cover wird zuvor entfernt, damit kein altes Duplikat bleibt.
+        app_cover = self._app_cover_path(ean)
+        if app_cover:
+            for fname in os.listdir(target):
+                stem, ext = os.path.splitext(fname)
+                if ext.lower() in (".jpg", ".jpeg", ".png") and stem.strip() == ean:
+                    try:
+                        os.remove(os.path.join(target, fname))
+                    except OSError as e:
+                        logger.warning("Storytel: altes Cover %s nicht entfernbar: %s", fname, e)
+            shutil.copy2(app_cover, os.path.join(target, f"{ean}.jpg"))
+            logger.info("Storytel: Cover für %s durch aktuelles App-Cover ersetzt", ean)
+
         # Passende XML in den Titelordner legen
         shutil.copy2(xml_src, os.path.join(target, f"{ean}.xml"))
         return target

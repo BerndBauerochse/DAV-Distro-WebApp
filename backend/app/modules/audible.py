@@ -173,6 +173,7 @@ class AudibleModule(BasePortalModule):
 
             injected = self._inject_toc(zip_dest, ean)
             pdf_injected = self._inject_pdf_into_zip(zip_dest, ean, self.pdf_dir)
+            cover_swapped = self._swap_cover_in_zip(zip_dest, ean)
 
             transfers.append(FileTransfer(
                 ean=ean,
@@ -183,7 +184,8 @@ class AudibleModule(BasePortalModule):
                 file_size_bytes=os.path.getsize(zip_dest),
                 injected_files=(
                     [(name, "toc") for name in injected] +
-                    ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [])
+                    ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else []) +
+                    ([(f"{ean}.jpg", "cover")] if cover_swapped else [])
                 ),
             ))
 
@@ -725,6 +727,7 @@ class AudibleCorrModule(AudibleModule):
                 shutil.copy2(zip_src, zip_dest)
                 injected = self._inject_toc(zip_dest, ean)
                 pdf_injected = self._inject_pdf_into_zip(zip_dest, ean, self.pdf_dir)
+                cover_swapped = self._swap_cover_in_zip(zip_dest, ean)
 
                 transfers.append(FileTransfer(
                     ean=ean,
@@ -735,7 +738,8 @@ class AudibleCorrModule(AudibleModule):
                     file_size_bytes=os.path.getsize(zip_dest),
                     injected_files=(
                         [(name, "toc") for name in injected] +
-                        ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [])
+                        ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else []) +
+                        ([(f"{ean}.jpg", "cover")] if cover_swapped else [])
                     ),
                 ))
 

@@ -63,15 +63,23 @@ class RTLModule(BasePortalModule):
             if not os.path.isfile(src):
                 logger.warning(f"RTL+: ZIP nicht gefunden: {src}")
                 continue
-            # PDF-Injection: wenn PDF vorhanden, ZIP in Export-Dir kopieren und PDF anhängen
+            # PDF-Injection und/oder Cover-Austausch: nur wenn eine PDF ODER ein
+            # App-Cover vorliegt, wird die ZIP in den Export-Ordner kopiert und dort
+            # bearbeitet. Das Original im Quellordner bleibt unangetastet.
             pdf_path = os.path.join(self.pdf_dir, f"{ean}.pdf")
-            if os.path.isfile(pdf_path):
+            has_pdf = os.path.isfile(pdf_path)
+            has_cover = self._app_cover_path(ean) is not None
+            if has_pdf or has_cover:
                 os.makedirs(self.export_dir, exist_ok=True)
                 dest = os.path.join(self.export_dir, f"{ean}.zip")
                 shutil.copy2(src, dest)
-                self._inject_pdf_into_zip(dest, ean, self.pdf_dir)
+                pdf_injected = self._inject_pdf_into_zip(dest, ean, self.pdf_dir)
+                cover_swapped = self._swap_cover_in_zip(dest, ean)
                 source_path = dest
-                injected = [(f"{ean}_booklet.pdf", "pdf")]
+                injected = (
+                    ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else []) +
+                    ([(f"{ean}.jpg", "cover")] if cover_swapped else [])
+                )
             else:
                 source_path = src
                 injected = []

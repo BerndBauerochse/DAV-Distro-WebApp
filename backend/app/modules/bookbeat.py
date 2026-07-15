@@ -59,11 +59,15 @@ class BookbeatModule(BasePortalModule):
             if src != dest:
                 shutil.copy2(src, dest)
             pdf_injected = self._inject_pdf_into_zip(dest, ean, self.pdf_dir)
+            cover_swapped = self._swap_cover_in_zip(dest, ean)
             transfers.append(FileTransfer(
                 ean=ean, file_name=f"{ean}.zip", file_type="zip",
                 source_path=dest, destination=f"/{ean}.zip",
                 file_size_bytes=os.path.getsize(dest),
-                injected_files=[(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else [],
+                injected_files=(
+                    ([(f"{ean}_booklet.pdf", "pdf")] if pdf_injected else []) +
+                    ([(f"{ean}.jpg", "cover")] if cover_swapped else [])
+                ),
             ))
 
         return transfers

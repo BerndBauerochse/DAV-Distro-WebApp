@@ -56,10 +56,12 @@ class SpotifyModule(BasePortalModule):
             dest = os.path.join(self.export_dir, f"{ean}.zip")
             if src != dest:
                 shutil.copy2(src, dest)
+            cover_swapped = self._swap_cover_in_zip(dest, ean)
             transfers.append(FileTransfer(
                 ean=ean, file_name=f"{ean}.zip", file_type="zip",
                 source_path=dest, destination=f"/{ean}.zip",
                 file_size_bytes=os.path.getsize(dest),
+                injected_files=[(f"{ean}.jpg", "cover")] if cover_swapped else [],
             ))
 
         return transfers

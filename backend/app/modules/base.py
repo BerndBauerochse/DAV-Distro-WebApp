@@ -91,6 +91,77 @@ class BasePortalModule(ABC):
         logger.info("PDF für %s in ZIP eingefügt: %s_booklet.pdf", ean, ean)
         return True
 
+    def _app_cover_path(self, ean: str, covers_dir: str | None = None) -> str | None:
+        """Pfad zum in der App hinterlegten Cover {ean}.jpg, oder None wenn keins
+        existiert. covers_dir defaultet auf STORAGE_DIR/covers."""
+        covers_dir = covers_dir or os.path.join(os.getenv("STORAGE_DIR", "/storage"), "covers")
+        p = os.path.join(covers_dir, f"{ean}.jpg")
+        return p if os.path.isfile(p) else None
+
+    def _swap_cover_in_zip(self, zip_path: str, ean: str, covers_dir: str | None = None) -> bool:
+        """Ersetzt das Cover {ean}.jpg in der ZIP durch das in der App hinterlegte
+        Cover — aber nur, wenn dieses existiert UND sich vom Cover in der ZIP
+        unterscheidet. Gibt True zurück, wenn tatsächlich getauscht wurde.
+
+        Sicherheit: arbeitet ausschließlich auf zip_path (der Arbeitskopie im
+        Export-Ordner). Der Aufrufer muss sicherstellen, dass dies nicht die
+        Original-ZIP im schreibgeschützten Quellordner ist. Das ZIP wird neu
+        gepackt (Cover ersetzt, alle anderen Einträge unverändert) und erst am
+        Ende atomar an die Stelle der Arbeitskopie geschoben."""
+        app_cover = self._app_cover_path(ean, covers_dir)
+        if not app_cover:
+            return False
+        try:
+            with open(app_cover, "rb") as f:
+                new_bytes = f.read()
+        except OSError as e:
+            logger.warning("Cover-Austausch: App-Cover nicht lesbar für %s: %s", ean, e)
+            return False
+
+        target = f"{ean}.jpg"
+
+        # 1. Cover in der ZIP finden und prüfen, ob ein Austausch überhaupt nötig ist.
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                cover_entry = next(
+                    (i for i in zf.infolist()
+                     if os.path.basename(i.filename).lower() == target.lower()),
+                    None,
+                )
+                if cover_entry is None:
+                    logger.debug("Cover-Austausch: kein %s in ZIP %s — übersprungen",
+                                 target, os.path.basename(zip_path))
+                    return False
+                if zf.read(cover_entry) == new_bytes:
+                    return False  # identisch → nichts zu tun
+                cover_name = cover_entry.filename  # exakter Pfad in der ZIP (ggf. Unterordner)
+        except (zipfile.BadZipFile, OSError) as e:
+            logger.error("Cover-Austausch: ZIP nicht lesbar %s: %s", zip_path, e)
+            return False
+
+        # 2. ZIP neu schreiben: Cover-Eintrag ersetzen, Rest 1:1 übernehmen.
+        tmp_path = zip_path + ".covertmp"
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zin, \
+                 zipfile.ZipFile(tmp_path, "w") as zout:
+                for info in zin.infolist():
+                    if info.filename == cover_name:
+                        zout.writestr(info, new_bytes)  # gleicher Name/Pfad, neue Bytes
+                    else:
+                        zout.writestr(info, zin.read(info))  # Kompression je Eintrag bleibt erhalten
+            os.replace(tmp_path, zip_path)  # atomar ersetzen
+        except Exception as e:
+            logger.error("Cover-Austausch: Neu-Packen fehlgeschlagen für %s: %s", ean, e)
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+            return False
+
+        logger.info("Cover-Austausch: %s in ZIP ersetzt (%s)", cover_name, os.path.basename(zip_path))
+        return True
+
     def supports_cover_exchange(self) -> bool:
         """True, wenn der Kanal Cover empfangen kann (Standard-SFTP-Zugang).
         Sonderfälle (Bookwire/FTPS, Divibib/FTP, Google) überschreiben dies."""
