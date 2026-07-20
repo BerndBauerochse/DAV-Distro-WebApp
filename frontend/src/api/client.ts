@@ -30,7 +30,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  outlookStatus(): Promise<{ configured: boolean; mailbox: string | null }> {
+  outlookStatus(): Promise<{ configured: boolean; mailbox: string | null; default_cc: string | null }> {
     return request('/mail/outlook/status')
   },
 
@@ -39,6 +39,7 @@ export const api = {
     subject: string
     body: string
     is_html?: boolean
+    cc?: string | null
     bcc?: string | null
     run_id?: string | null
     with_attachment?: boolean
@@ -55,6 +56,7 @@ export const api = {
     subject: string
     body: string
     is_html?: boolean
+    cc?: string | null
     bcc?: string | null
     run_id?: string | null
     with_attachment?: boolean

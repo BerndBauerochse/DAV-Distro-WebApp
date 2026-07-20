@@ -100,6 +100,7 @@ def _build_message(
     is_html: bool,
     bcc: str | None,
     attachment_path: str | None,
+    cc: str | None = None,
 ) -> dict:
     message: dict = {
         "subject": subject,
@@ -109,6 +110,9 @@ def _build_message(
         },
         "toRecipients": _split_addresses(to),
     }
+    cc_recipients = _split_addresses(cc)
+    if cc_recipients:
+        message["ccRecipients"] = cc_recipients
     bcc_recipients = _split_addresses(bcc)
     if bcc_recipients:
         message["bccRecipients"] = bcc_recipients
@@ -171,6 +175,7 @@ def create_outlook_draft(
     is_html: bool = False,
     bcc: str | None = None,
     attachment_path: str | None = None,
+    cc: str | None = None,
 ) -> dict:
     """Legt einen Entwurf im Versand-Postfach an. Gibt {web_link} zurück.
 
@@ -180,7 +185,7 @@ def create_outlook_draft(
         raise RuntimeError("Outlook-Anbindung ist nicht konfiguriert.")
 
     cfg = _cfg()
-    message = _build_message(to, subject, body, is_html, bcc, attachment_path)
+    message = _build_message(to, subject, body, is_html, bcc, attachment_path, cc)
     created = _graph_post(
         f"/users/{urllib.parse.quote(cfg['mailbox'])}/messages",
         message,
@@ -197,6 +202,7 @@ def send_outlook_mail(
     is_html: bool = False,
     bcc: str | None = None,
     attachment_path: str | None = None,
+    cc: str | None = None,
 ) -> None:
     """Versendet die Mail direkt über das Versand-Postfach. Die gesendete Mail
     landet in dessen 'Gesendeten Elementen' (saveToSentItems).
@@ -207,7 +213,7 @@ def send_outlook_mail(
         raise RuntimeError("Outlook-Anbindung ist nicht konfiguriert.")
 
     cfg = _cfg()
-    message = _build_message(to, subject, body, is_html, bcc, attachment_path)
+    message = _build_message(to, subject, body, is_html, bcc, attachment_path, cc)
     _graph_post(
         f"/users/{urllib.parse.quote(cfg['mailbox'])}/sendMail",
         {"message": message, "saveToSentItems": True},

@@ -29,19 +29,33 @@ class OutlookDraftRequest(BaseModel):
     subject: str
     body: str
     is_html: bool = False
+    cc: str | None = None
     bcc: str | None = None
     # Wenn gesetzt und der Run eine Metadatei hat, wird sie angehängt
     run_id: uuid.UUID | None = None
     with_attachment: bool = False
 
 
+def _default_cc_for(user: str) -> str | None:
+    """Der jeweils andere Nutzer kommt automatisch in CC:
+    Bernd sendet → Doro in CC, Doro sendet → Bernd in CC.
+    Adressen kommen aus USER_BERND_EMAIL / USER_DORO_EMAIL (Coolify)."""
+    partner = {
+        "bernd": os.getenv("USER_DORO_EMAIL", "").strip(),
+        "doro": os.getenv("USER_BERND_EMAIL", "").strip(),
+    }
+    return partner.get(user.lower()) or None
+
+
 @router.get("/outlook/status")
-async def outlook_status(_user: str = Depends(get_current_user)):
-    """Sagt dem Frontend, ob die Outlook-Übergabe eingerichtet ist."""
+async def outlook_status(user: str = Depends(get_current_user)):
+    """Sagt dem Frontend, ob die Outlook-Übergabe eingerichtet ist —
+    und welches CC für den eingeloggten Nutzer vorbelegt wird."""
     configured = graph_mailer.is_configured()
     return {
         "configured": configured,
         "mailbox": graph_mailer.mailbox_address() if configured else None,
+        "default_cc": _default_cc_for(user),
     }
 
 
@@ -85,6 +99,7 @@ async def create_outlook_draft(
         result = await run_in_threadpool(
             graph_mailer.create_outlook_draft,
             req.to, req.subject, req.body, req.is_html, req.bcc, attachment_path,
+            req.cc,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
@@ -108,6 +123,7 @@ async def send_outlook_mail(
         await run_in_threadpool(
             graph_mailer.send_outlook_mail,
             req.to, req.subject, req.body, req.is_html, req.bcc, attachment_path,
+            req.cc,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))

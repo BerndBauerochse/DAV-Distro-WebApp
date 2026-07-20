@@ -43,8 +43,16 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
   const [outlookState, setOutlookState] = useState<'idle' | 'loading' | 'done'>('idle')
   const [outlookError, setOutlookError] = useState('')
 
+  // Ist die Outlook-365-Übergabe auf dem Server eingerichtet?
+  const { data: outlookStatus } = useQuery({
+    queryKey: ['outlook-status'],
+    queryFn: () => api.outlookStatus(),
+    staleTime: 5 * 60 * 1000,
+  })
+
   // Bearbeitbare Entwurfsfelder — vorbefüllt aus dem generierten Entwurf.
   const [to, setTo] = useState(draft.to)
+  const [cc, setCc] = useState('')
   const [bcc, setBcc] = useState(draft.bcc ?? '')
   const [subject, setSubject] = useState(draft.subject)
   const [textBody, setTextBody] = useState(draft.is_html ? '' : draft.body)
@@ -52,9 +60,12 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
   // bearbeitet (contentEditable); gelesen wird beim Senden aus dem DOM.
   const htmlBodyRef = useRef<HTMLDivElement>(null)
 
-  // Wenn der nächste Entwurf aus der Queue nachrückt: Felder + Status zurücksetzen
+  // Wenn der nächste Entwurf aus der Queue nachrückt: Felder + Status zurücksetzen.
+  // CC wird mit dem jeweils anderen Nutzer vorbelegt (Bernd↔Doro, vom Server).
+  const defaultCc = outlookStatus?.default_cc ?? ''
   useEffect(() => {
     setTo(draft.to)
+    setCc(defaultCc)
     setBcc(draft.bcc ?? '')
     setSubject(draft.subject)
     setTextBody(draft.is_html ? '' : draft.body)
@@ -64,20 +75,13 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
     setOutlookState('idle')
     setOutlookError('')
     setAttachmentError('')
-  }, [draft])
+  }, [draft, defaultCc])
 
   function currentBody(): string {
     return draft.is_html ? (htmlBodyRef.current?.innerHTML ?? draft.body) : textBody
   }
 
   const sendDisabled = !to.trim() || !subject.trim()
-
-  // Ist die Outlook-365-Übergabe auf dem Server eingerichtet?
-  const { data: outlookStatus } = useQuery({
-    queryKey: ['outlook-status'],
-    queryFn: () => api.outlookStatus(),
-    staleTime: 5 * 60 * 1000,
-  })
 
   async function sendToOutlook() {
     setOutlookState('loading')
@@ -88,6 +92,7 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
         subject,
         body: currentBody(),
         is_html: draft.is_html,
+        cc: cc.trim() || null,
         bcc: bcc.trim() || null,
         run_id: runId,
         with_attachment: !!draft.attachment,
@@ -135,6 +140,7 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
         'MIME-Version: 1.0',
         'X-Unsent: 1',
         `To: ${to}`,
+        ...(cc.trim() ? [`Cc: ${cc}`] : []),
         ...(bcc.trim() ? [`Bcc: ${bcc}`] : []),
         `Subject: ${subject}`,
         `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -160,6 +166,7 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
         'MIME-Version: 1.0',
         'X-Unsent: 1',
         `To: ${to}`,
+        ...(cc.trim() ? [`Cc: ${cc}`] : []),
         ...(bcc.trim() ? [`Bcc: ${bcc}`] : []),
         `Subject: ${subject}`,
         'Content-Type: text/html; charset=utf-8',
@@ -224,6 +231,11 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>An</p>
             <input type="text" value={to} onChange={e => setTo(e.target.value)}
               className="glass-input w-full text-sm" placeholder="empfaenger@portal.de" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs" style={{ color: 'var(--text-300)' }}>Cc</p>
+            <input type="text" value={cc} onChange={e => setCc(e.target.value)}
+              className="glass-input w-full text-sm" placeholder="" />
           </div>
           <div className="space-y-1">
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>Bcc (optional)</p>
