@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Mail, X, Paperclip, ExternalLink, Loader2, Inbox, Check } from 'lucide-react'
 import { getStoredAuth } from '../hooks/useAuth'
@@ -44,6 +44,36 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
   const [outlookError, setOutlookError] = useState('')
   const [webLink, setWebLink] = useState<string | null>(null)
 
+  // Bearbeitbare Entwurfsfelder — vorbefüllt aus dem generierten Entwurf.
+  const [to, setTo] = useState(draft.to)
+  const [bcc, setBcc] = useState(draft.bcc ?? '')
+  const [subject, setSubject] = useState(draft.subject)
+  const [textBody, setTextBody] = useState(draft.is_html ? '' : draft.body)
+  // HTML-Bodies (z. B. Audible-Tabellen) werden direkt im gerenderten Zustand
+  // bearbeitet (contentEditable); gelesen wird beim Senden aus dem DOM.
+  const htmlBodyRef = useRef<HTMLDivElement>(null)
+
+  // Wenn der nächste Entwurf aus der Queue nachrückt: Felder + Status zurücksetzen
+  useEffect(() => {
+    setTo(draft.to)
+    setBcc(draft.bcc ?? '')
+    setSubject(draft.subject)
+    setTextBody(draft.is_html ? '' : draft.body)
+    if (draft.is_html && htmlBodyRef.current) {
+      htmlBodyRef.current.innerHTML = draft.body
+    }
+    setOutlookState('idle')
+    setOutlookError('')
+    setWebLink(null)
+    setAttachmentError('')
+  }, [draft])
+
+  function currentBody(): string {
+    return draft.is_html ? (htmlBodyRef.current?.innerHTML ?? draft.body) : textBody
+  }
+
+  const sendDisabled = !to.trim() || !subject.trim()
+
   // Ist die Outlook-365-Übergabe auf dem Server eingerichtet?
   const { data: outlookStatus } = useQuery({
     queryKey: ['outlook-status'],
@@ -56,11 +86,11 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
     setOutlookError('')
     try {
       const res = await api.createOutlookDraft({
-        to: draft.to,
-        subject: draft.subject,
-        body: draft.body,
+        to,
+        subject,
+        body: currentBody(),
         is_html: draft.is_html,
-        bcc: draft.bcc ?? null,
+        bcc: bcc.trim() || null,
         run_id: runId,
         with_attachment: !!draft.attachment,
       })
@@ -81,7 +111,7 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
     try {
     // Body immer als HTML einbetten — der einzige Pfad, den Outlook beim
     // Öffnen von X-Unsent-Entwürfen nachweislich zuverlässig übernimmt.
-    const htmlBody = toHtmlBody(draft.body, draft.is_html)
+    const htmlBody = toHtmlBody(currentBody(), draft.is_html)
     let eml: string
 
     if (draft.attachment) {
@@ -107,9 +137,9 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
       eml = [
         'MIME-Version: 1.0',
         'X-Unsent: 1',
-        `To: ${draft.to}`,
-        ...(draft.bcc ? [`Bcc: ${draft.bcc}`] : []),
-        `Subject: ${draft.subject}`,
+        `To: ${to}`,
+        ...(bcc.trim() ? [`Bcc: ${bcc}`] : []),
+        `Subject: ${subject}`,
         `Content-Type: multipart/mixed; boundary="${boundary}"`,
         '',
         `--${boundary}`,
@@ -132,9 +162,9 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
       eml = [
         'MIME-Version: 1.0',
         'X-Unsent: 1',
-        `To: ${draft.to}`,
-        ...(draft.bcc ? [`Bcc: ${draft.bcc}`] : []),
-        `Subject: ${draft.subject}`,
+        `To: ${to}`,
+        ...(bcc.trim() ? [`Bcc: ${bcc}`] : []),
+        `Subject: ${subject}`,
         'Content-Type: text/html; charset=utf-8',
         '',
         htmlBody,
@@ -191,39 +221,37 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
           </button>
         </div>
 
-        {/* Mail info */}
+        {/* Mail-Felder — bearbeitbar vor der Übergabe */}
         <div className="px-6 py-5 space-y-3">
-          <div className="rounded-xl p-3 space-y-1"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+          <div className="space-y-1">
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>An</p>
-            <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.to}</p>
+            <input type="text" value={to} onChange={e => setTo(e.target.value)}
+              className="glass-input w-full text-sm" placeholder="empfaenger@portal.de" />
           </div>
-          {draft.bcc && (
-            <div className="rounded-xl p-3 space-y-1"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
-              <p className="text-xs" style={{ color: 'var(--text-300)' }}>Bcc</p>
-              <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.bcc}</p>
-            </div>
-          )}
-          <div className="rounded-xl p-3 space-y-1"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
+          <div className="space-y-1">
+            <p className="text-xs" style={{ color: 'var(--text-300)' }}>Bcc (optional)</p>
+            <input type="text" value={bcc} onChange={e => setBcc(e.target.value)}
+              className="glass-input w-full text-sm" placeholder="" />
+          </div>
+          <div className="space-y-1">
             <p className="text-xs" style={{ color: 'var(--text-300)' }}>Betreff</p>
-            <p className="text-sm" style={{ color: 'var(--text-100)' }}>{draft.subject}</p>
+            <input type="text" value={subject} onChange={e => setSubject(e.target.value)}
+              className="glass-input w-full text-sm" />
           </div>
 
-          {/* Body preview */}
-          <div className="rounded-xl p-3 space-y-1"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
-            <p className="text-xs" style={{ color: 'var(--text-300)' }}>Inhalt</p>
+          {/* Inhalt — bearbeitbar (HTML direkt im gerenderten Zustand) */}
+          <div className="space-y-1">
+            <p className="text-xs" style={{ color: 'var(--text-300)' }}>Inhalt (bearbeitbar)</p>
             {draft.is_html ? (
-              <div className="text-sm max-h-40 overflow-y-auto"
-                style={{ color: 'var(--text-200)' }}
+              <div ref={htmlBodyRef} contentEditable suppressContentEditableWarning
+                className="glass-input w-full text-sm max-h-48 overflow-y-auto"
+                style={{ color: 'var(--text-200)', minHeight: '6rem' }}
                 dangerouslySetInnerHTML={{ __html: draft.body }} />
             ) : (
-              <pre className="text-sm whitespace-pre-wrap max-h-40 overflow-y-auto"
-                style={{ color: 'var(--text-200)', fontFamily: 'inherit' }}>
-                {draft.body}
-              </pre>
+              <textarea value={textBody} onChange={e => setTextBody(e.target.value)}
+                rows={7}
+                className="glass-input w-full text-sm max-h-48"
+                style={{ color: 'var(--text-200)', fontFamily: 'inherit', resize: 'vertical' }} />
             )}
           </div>
 
@@ -270,18 +298,18 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
           <button onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
             {queueCount > 1 ? 'Nächste' : 'Schließen'}
           </button>
-          <button onClick={openAsEml} disabled={loading}
+          <button onClick={openAsEml} disabled={loading || sendDisabled}
             className={outlookStatus?.configured ? 'btn-ghost flex items-center gap-2 px-4 py-2 text-sm' : 'btn-accent flex items-center gap-2 px-5 py-2 text-sm'}
-            style={loading ? { opacity: 0.7, cursor: 'wait' } : {}}>
+            style={loading || sendDisabled ? { opacity: 0.6, cursor: loading ? 'wait' : 'not-allowed' } : {}}>
             {loading
               ? <><Loader2 className="w-4 h-4 animate-spin" />Laden…</>
               : <><ExternalLink className="w-4 h-4" />Als EML öffnen</>
             }
           </button>
           {outlookStatus?.configured && (
-            <button onClick={sendToOutlook} disabled={outlookState !== 'idle'}
+            <button onClick={sendToOutlook} disabled={outlookState !== 'idle' || sendDisabled}
               className="btn-accent flex items-center gap-2 px-5 py-2 text-sm"
-              style={outlookState !== 'idle' ? { opacity: 0.7, cursor: outlookState === 'loading' ? 'wait' : 'default' } : {}}>
+              style={outlookState !== 'idle' || sendDisabled ? { opacity: 0.6, cursor: outlookState === 'loading' ? 'wait' : 'not-allowed' } : {}}>
               {outlookState === 'loading'
                 ? <><Loader2 className="w-4 h-4 animate-spin" />Übergeben…</>
                 : outlookState === 'done'
