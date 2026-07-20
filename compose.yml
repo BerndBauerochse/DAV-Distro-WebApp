@@ -24,6 +24,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       USER_BERND_PASSWORD: ${USER_BERND_PASSWORD:-Bx7@kP3mLw}
       USER_DORO_PASSWORD: ${USER_DORO_PASSWORD:-Qn5!sJ7vYe}
+      # Outlook-365-Übergabe (Microsoft Graph). Ohne diese vier Werte ist die
+      # Funktion deaktiviert und die App nutzt weiter den EML-Download.
+      GRAPH_TENANT_ID: ${GRAPH_TENANT_ID:-}
+      GRAPH_CLIENT_ID: ${GRAPH_CLIENT_ID:-}
+      GRAPH_CLIENT_SECRET: ${GRAPH_CLIENT_SECRET:-}
+      GRAPH_SENDER_MAILBOX: ${GRAPH_SENDER_MAILBOX:-}
     volumes:
       - ./config:/app/config:ro
       - uploads:/app/uploads

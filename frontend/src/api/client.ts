@@ -30,6 +30,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  outlookStatus(): Promise<{ configured: boolean; mailbox: string | null }> {
+    return request('/mail/outlook/status')
+  },
+
+  createOutlookDraft(payload: {
+    to: string
+    subject: string
+    body: string
+    is_html?: boolean
+    bcc?: string | null
+    run_id?: string | null
+    with_attachment?: boolean
+  }): Promise<{ ok: boolean; web_link: string | null }> {
+    return request('/mail/outlook/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
+
   login(username: string, password: string): Promise<{ access_token: string; username: string }> {
     return request('/auth/login', {
       method: 'POST',

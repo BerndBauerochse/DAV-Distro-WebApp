@@ -1,0 +1,82 @@
+"""Outlook-365-Übergabe: legt einen Mail-Entwurf direkt im Versand-Postfach ab.
+
+Der Frontend-Dialog schickt die Entwurfsdaten hierher; ein evtl. Anhang
+(Metadatei des Runs) wird serverseitig über die run_id aufgelöst — derselbe
+Pfad, den auch der EML-Download nutzt.
+"""
+import logging
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.auth import get_current_user
+from app.database import get_db
+from app.models import DeliveryRun
+from app.services import graph_mailer
+from app.services.delivery_service import get_metadata_path
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/mail", tags=["mail"])
+
+
+class OutlookDraftRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
+    is_html: bool = False
+    bcc: str | None = None
+    # Wenn gesetzt und der Run eine Metadatei hat, wird sie angehängt
+    run_id: uuid.UUID | None = None
+    with_attachment: bool = False
+
+
+@router.get("/outlook/status")
+async def outlook_status(_user: str = Depends(get_current_user)):
+    """Sagt dem Frontend, ob die Outlook-Übergabe eingerichtet ist."""
+    configured = graph_mailer.is_configured()
+    return {
+        "configured": configured,
+        "mailbox": graph_mailer.mailbox_address() if configured else None,
+    }
+
+
+@router.post("/outlook/draft")
+async def create_outlook_draft(
+    req: OutlookDraftRequest,
+    db: AsyncSession = Depends(get_db),
+    user: str = Depends(get_current_user),
+):
+    if not graph_mailer.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Outlook-Anbindung ist nicht konfiguriert (GRAPH_*-Variablen fehlen).",
+        )
+
+    attachment_path: str | None = None
+    if req.with_attachment and req.run_id:
+        run = await db.get(DeliveryRun, req.run_id)
+        if run:
+            path = get_metadata_path(str(req.run_id)) or run.metadata_path
+            if path and os.path.isfile(path):
+                attachment_path = path
+        if not attachment_path:
+            raise HTTPException(
+                status_code=404,
+                detail="Anhang (Metadatei) ist nicht mehr verfügbar.",
+            )
+
+    try:
+        result = await run_in_threadpool(
+            graph_mailer.create_outlook_draft,
+            req.to, req.subject, req.body, req.is_html, req.bcc, attachment_path,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    logger.info("Outlook-Entwurf von %s: %s", user, req.subject)
+    return {"ok": True, "web_link": result.get("web_link")}

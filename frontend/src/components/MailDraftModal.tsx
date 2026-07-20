@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Mail, X, Paperclip, ExternalLink, Loader2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Mail, X, Paperclip, ExternalLink, Loader2, Inbox, Check } from 'lucide-react'
 import { getStoredAuth } from '../hooks/useAuth'
+import { api } from '../api/client'
 import type { MailDraft } from '../types'
 
 interface Props {
@@ -35,9 +37,43 @@ function toHtmlBody(body: string, isHtml: boolean | undefined): string {
   )
 }
 
-export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: Props) {
+export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClose }: Props) {
   const [attachmentError, setAttachmentError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [outlookState, setOutlookState] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [outlookError, setOutlookError] = useState('')
+  const [webLink, setWebLink] = useState<string | null>(null)
+
+  // Ist die Outlook-365-Übergabe auf dem Server eingerichtet?
+  const { data: outlookStatus } = useQuery({
+    queryKey: ['outlook-status'],
+    queryFn: () => api.outlookStatus(),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  async function sendToOutlook() {
+    setOutlookState('loading')
+    setOutlookError('')
+    try {
+      const res = await api.createOutlookDraft({
+        to: draft.to,
+        subject: draft.subject,
+        body: draft.body,
+        is_html: draft.is_html,
+        bcc: draft.bcc ?? null,
+        run_id: runId,
+        with_attachment: !!draft.attachment,
+      })
+      setWebLink(res.web_link)
+      setOutlookState('done')
+    } catch (e) {
+      setOutlookState('idle')
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler'
+      // Server-Detail aus "502 {...detail...}" herausziehen, sonst Rohtext
+      const m = msg.match(/"detail"\s*:\s*"([^"]+)"/)
+      setOutlookError(m ? m[1] : msg)
+    }
+  }
 
   async function openAsEml() {
     setLoading(true)
@@ -205,6 +241,27 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
           {attachmentError && (
             <p className="text-xs" style={{ color: '#f87171' }}>{attachmentError}</p>
           )}
+
+          {/* Outlook-Übergabe: Erfolg / Fehler */}
+          {outlookState === 'done' && (
+            <div className="rounded-xl p-3 flex items-center gap-2"
+              style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)' }}>
+              <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#4ade80' }} />
+              <div>
+                <p className="text-xs font-medium" style={{ color: '#4ade80' }}>
+                  Entwurf liegt im Postfach{outlookStatus?.mailbox ? ` (${outlookStatus.mailbox})` : ''}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--text-300)' }}>
+                  Zum Prüfen und Absenden in Outlook öffnen.
+                  {webLink && <> <a href={webLink} target="_blank" rel="noreferrer"
+                    style={{ color: '#4ade80', textDecoration: 'underline' }}>Direkt öffnen</a></>}
+                </p>
+              </div>
+            </div>
+          )}
+          {outlookError && (
+            <p className="text-xs" style={{ color: '#f87171' }}>{outlookError}</p>
+          )}
         </div>
 
         {/* Footer */}
@@ -214,13 +271,25 @@ export function MailDraftModal({ draft, portalName, queueCount = 1, onClose }: P
             {queueCount > 1 ? 'Nächste' : 'Schließen'}
           </button>
           <button onClick={openAsEml} disabled={loading}
-            className="btn-accent flex items-center gap-2 px-5 py-2 text-sm"
+            className={outlookStatus?.configured ? 'btn-ghost flex items-center gap-2 px-4 py-2 text-sm' : 'btn-accent flex items-center gap-2 px-5 py-2 text-sm'}
             style={loading ? { opacity: 0.7, cursor: 'wait' } : {}}>
             {loading
               ? <><Loader2 className="w-4 h-4 animate-spin" />Laden…</>
-              : <><ExternalLink className="w-4 h-4" />In Outlook öffnen</>
+              : <><ExternalLink className="w-4 h-4" />Als EML öffnen</>
             }
           </button>
+          {outlookStatus?.configured && (
+            <button onClick={sendToOutlook} disabled={outlookState !== 'idle'}
+              className="btn-accent flex items-center gap-2 px-5 py-2 text-sm"
+              style={outlookState !== 'idle' ? { opacity: 0.7, cursor: outlookState === 'loading' ? 'wait' : 'default' } : {}}>
+              {outlookState === 'loading'
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Übergeben…</>
+                : outlookState === 'done'
+                  ? <><Check className="w-4 h-4" />Im Postfach</>
+                  : <><Inbox className="w-4 h-4" />In Outlook ablegen</>
+              }
+            </button>
+          )}
         </div>
       </div>
     </div>
