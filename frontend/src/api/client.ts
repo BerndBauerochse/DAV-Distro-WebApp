@@ -50,6 +50,22 @@ export const api = {
     })
   },
 
+  sendOutlookMail(payload: {
+    to: string
+    subject: string
+    body: string
+    is_html?: boolean
+    bcc?: string | null
+    run_id?: string | null
+    with_attachment?: boolean
+  }): Promise<{ ok: boolean }> {
+    return request('/mail/outlook/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+  },
+
   login(username: string, password: string): Promise<{ access_token: string; username: string }> {
     return request('/auth/login', {
       method: 'POST',

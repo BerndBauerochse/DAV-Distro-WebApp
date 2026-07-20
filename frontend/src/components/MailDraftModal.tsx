@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, X, Paperclip, ExternalLink, Loader2, Inbox, Check } from 'lucide-react'
+import { Mail, X, Paperclip, ExternalLink, Loader2, Send, Check } from 'lucide-react'
 import { getStoredAuth } from '../hooks/useAuth'
 import { api } from '../api/client'
 import type { MailDraft } from '../types'
@@ -42,7 +42,6 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
   const [loading, setLoading] = useState(false)
   const [outlookState, setOutlookState] = useState<'idle' | 'loading' | 'done'>('idle')
   const [outlookError, setOutlookError] = useState('')
-  const [webLink, setWebLink] = useState<string | null>(null)
 
   // Bearbeitbare Entwurfsfelder — vorbefüllt aus dem generierten Entwurf.
   const [to, setTo] = useState(draft.to)
@@ -64,7 +63,6 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
     }
     setOutlookState('idle')
     setOutlookError('')
-    setWebLink(null)
     setAttachmentError('')
   }, [draft])
 
@@ -85,7 +83,7 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
     setOutlookState('loading')
     setOutlookError('')
     try {
-      const res = await api.createOutlookDraft({
+      await api.sendOutlookMail({
         to,
         subject,
         body: currentBody(),
@@ -94,7 +92,6 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
         run_id: runId,
         with_attachment: !!draft.attachment,
       })
-      setWebLink(res.web_link)
       setOutlookState('done')
     } catch (e) {
       setOutlookState('idle')
@@ -270,19 +267,17 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
             <p className="text-xs" style={{ color: '#f87171' }}>{attachmentError}</p>
           )}
 
-          {/* Outlook-Übergabe: Erfolg / Fehler */}
+          {/* Outlook-Versand: Erfolg / Fehler */}
           {outlookState === 'done' && (
             <div className="rounded-xl p-3 flex items-center gap-2"
               style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.25)' }}>
               <Check className="w-4 h-4 flex-shrink-0" style={{ color: '#4ade80' }} />
               <div>
                 <p className="text-xs font-medium" style={{ color: '#4ade80' }}>
-                  Entwurf liegt im Postfach{outlookStatus?.mailbox ? ` (${outlookStatus.mailbox})` : ''}
+                  Mail wurde versendet
                 </p>
                 <p className="text-xs" style={{ color: 'var(--text-300)' }}>
-                  Zum Prüfen und Absenden in Outlook öffnen.
-                  {webLink && <> <a href={webLink} target="_blank" rel="noreferrer"
-                    style={{ color: '#4ade80', textDecoration: 'underline' }}>Direkt öffnen</a></>}
+                  Liegt{outlookStatus?.mailbox ? ` im Postfach ${outlookStatus.mailbox}` : ''} unter „Gesendete Elemente".
                 </p>
               </div>
             </div>
@@ -311,10 +306,10 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
               className="btn-accent flex items-center gap-2 px-5 py-2 text-sm"
               style={outlookState !== 'idle' || sendDisabled ? { opacity: 0.6, cursor: outlookState === 'loading' ? 'wait' : 'not-allowed' } : {}}>
               {outlookState === 'loading'
-                ? <><Loader2 className="w-4 h-4 animate-spin" />Übergeben…</>
+                ? <><Loader2 className="w-4 h-4 animate-spin" />Senden…</>
                 : outlookState === 'done'
-                  ? <><Check className="w-4 h-4" />Im Postfach</>
-                  : <><Inbox className="w-4 h-4" />In Outlook ablegen</>
+                  ? <><Check className="w-4 h-4" />Gesendet</>
+                  : <><Send className="w-4 h-4" />Jetzt senden</>
               }
             </button>
           )}

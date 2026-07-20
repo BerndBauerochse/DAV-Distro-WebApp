@@ -93,21 +93,14 @@ def _split_addresses(raw: str | None) -> list[dict]:
     return [{"emailAddress": {"address": p}} for p in parts if p]
 
 
-def create_outlook_draft(
+def _build_message(
     to: str,
     subject: str,
     body: str,
-    is_html: bool = False,
-    bcc: str | None = None,
-    attachment_path: str | None = None,
+    is_html: bool,
+    bcc: str | None,
+    attachment_path: str | None,
 ) -> dict:
-    """Legt einen Entwurf im Versand-Postfach an. Gibt {web_link} zurück.
-
-    Blockierend (urllib) — vom Router aus per run_in_threadpool aufrufen.
-    """
-    if not is_configured():
-        raise RuntimeError("Outlook-Anbindung ist nicht konfiguriert.")
-
     message: dict = {
         "subject": subject,
         "body": {
@@ -134,12 +127,16 @@ def create_outlook_draft(
             "name": os.path.basename(attachment_path),
             "contentBytes": content_b64,
         }]
+    return message
 
+
+def _graph_post(path: str, payload: dict, action_label: str) -> dict:
+    """POST an Graph mit einheitlicher Fehlerübersetzung. Gibt die JSON-Antwort
+    zurück (leeres dict bei Antworten ohne Body, z. B. 202 bei sendMail)."""
     cfg = _cfg()
-    url = f"{GRAPH_BASE}/users/{urllib.parse.quote(cfg['mailbox'])}/messages"
     req = urllib.request.Request(
-        url,
-        data=json.dumps(message).encode(),
+        f"{GRAPH_BASE}{path}",
+        data=json.dumps(payload).encode(),
         method="POST",
         headers={
             "Authorization": f"Bearer {_get_token()}",
@@ -148,10 +145,11 @@ def create_outlook_draft(
     )
     try:
         with urllib.request.urlopen(req, timeout=GRAPH_TIMEOUT) as resp:
-            created = json.loads(resp.read())
+            raw = resp.read()
+            return json.loads(raw) if raw else {}
     except urllib.error.HTTPError as e:
         body_text = e.read().decode(errors="replace")[:500]
-        logger.error("Graph-Entwurf fehlgeschlagen (HTTP %s): %s", e.code, body_text)
+        logger.error("%s fehlgeschlagen (HTTP %s): %s", action_label, e.code, body_text)
         if e.code == 403:
             raise RuntimeError(
                 "Microsoft 365 hat den Zugriff verweigert — vermutlich fehlt die "
@@ -163,7 +161,56 @@ def create_outlook_draft(
                 f"Postfach '{cfg['mailbox']}' wurde nicht gefunden — bitte "
                 "GRAPH_SENDER_MAILBOX prüfen."
             ) from e
-        raise RuntimeError(f"Outlook-Übergabe fehlgeschlagen (HTTP {e.code}).") from e
+        raise RuntimeError(f"{action_label} fehlgeschlagen (HTTP {e.code}).") from e
 
+
+def create_outlook_draft(
+    to: str,
+    subject: str,
+    body: str,
+    is_html: bool = False,
+    bcc: str | None = None,
+    attachment_path: str | None = None,
+) -> dict:
+    """Legt einen Entwurf im Versand-Postfach an. Gibt {web_link} zurück.
+
+    Blockierend (urllib) — vom Router aus per run_in_threadpool aufrufen.
+    """
+    if not is_configured():
+        raise RuntimeError("Outlook-Anbindung ist nicht konfiguriert.")
+
+    cfg = _cfg()
+    message = _build_message(to, subject, body, is_html, bcc, attachment_path)
+    created = _graph_post(
+        f"/users/{urllib.parse.quote(cfg['mailbox'])}/messages",
+        message,
+        "Outlook-Entwurf",
+    )
     logger.info("Outlook-Entwurf angelegt in %s: %s", cfg["mailbox"], subject)
     return {"web_link": created.get("webLink"), "message_id": created.get("id")}
+
+
+def send_outlook_mail(
+    to: str,
+    subject: str,
+    body: str,
+    is_html: bool = False,
+    bcc: str | None = None,
+    attachment_path: str | None = None,
+) -> None:
+    """Versendet die Mail direkt über das Versand-Postfach. Die gesendete Mail
+    landet in dessen 'Gesendeten Elementen' (saveToSentItems).
+
+    Blockierend (urllib) — vom Router aus per run_in_threadpool aufrufen.
+    """
+    if not is_configured():
+        raise RuntimeError("Outlook-Anbindung ist nicht konfiguriert.")
+
+    cfg = _cfg()
+    message = _build_message(to, subject, body, is_html, bcc, attachment_path)
+    _graph_post(
+        f"/users/{urllib.parse.quote(cfg['mailbox'])}/sendMail",
+        {"message": message, "saveToSentItems": True},
+        "Outlook-Versand",
+    )
+    logger.info("Mail versendet über %s: %s → %s", cfg["mailbox"], subject, to)

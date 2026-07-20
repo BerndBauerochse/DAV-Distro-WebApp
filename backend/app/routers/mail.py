@@ -45,30 +45,41 @@ async def outlook_status(_user: str = Depends(get_current_user)):
     }
 
 
-@router.post("/outlook/draft")
-async def create_outlook_draft(
-    req: OutlookDraftRequest,
-    db: AsyncSession = Depends(get_db),
-    user: str = Depends(get_current_user),
-):
+async def _resolve_attachment(req: OutlookDraftRequest, db: AsyncSession) -> str | None:
+    """Löst den Anhang (Metadatei des Runs) serverseitig auf."""
+    if not (req.with_attachment and req.run_id):
+        return None
+    attachment_path: str | None = None
+    run = await db.get(DeliveryRun, req.run_id)
+    if run:
+        path = get_metadata_path(str(req.run_id)) or run.metadata_path
+        if path and os.path.isfile(path):
+            attachment_path = path
+    if not attachment_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Anhang (Metadatei) ist nicht mehr verfügbar.",
+        )
+    return attachment_path
+
+
+def _require_configured() -> None:
     if not graph_mailer.is_configured():
         raise HTTPException(
             status_code=503,
             detail="Outlook-Anbindung ist nicht konfiguriert (GRAPH_*-Variablen fehlen).",
         )
 
-    attachment_path: str | None = None
-    if req.with_attachment and req.run_id:
-        run = await db.get(DeliveryRun, req.run_id)
-        if run:
-            path = get_metadata_path(str(req.run_id)) or run.metadata_path
-            if path and os.path.isfile(path):
-                attachment_path = path
-        if not attachment_path:
-            raise HTTPException(
-                status_code=404,
-                detail="Anhang (Metadatei) ist nicht mehr verfügbar.",
-            )
+
+@router.post("/outlook/draft")
+async def create_outlook_draft(
+    req: OutlookDraftRequest,
+    db: AsyncSession = Depends(get_db),
+    user: str = Depends(get_current_user),
+):
+    """Legt die Mail als Entwurf im Versand-Postfach ab (ohne zu senden)."""
+    _require_configured()
+    attachment_path = await _resolve_attachment(req, db)
 
     try:
         result = await run_in_threadpool(
@@ -80,3 +91,26 @@ async def create_outlook_draft(
 
     logger.info("Outlook-Entwurf von %s: %s", user, req.subject)
     return {"ok": True, "web_link": result.get("web_link")}
+
+
+@router.post("/outlook/send")
+async def send_outlook_mail(
+    req: OutlookDraftRequest,
+    db: AsyncSession = Depends(get_db),
+    user: str = Depends(get_current_user),
+):
+    """Versendet die Mail direkt; sie erscheint in den Gesendeten Elementen
+    des Versand-Postfachs."""
+    _require_configured()
+    attachment_path = await _resolve_attachment(req, db)
+
+    try:
+        await run_in_threadpool(
+            graph_mailer.send_outlook_mail,
+            req.to, req.subject, req.body, req.is_html, req.bcc, attachment_path,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    logger.info("Mail versendet von %s an %s: %s", user, req.to, req.subject)
+    return {"ok": True}
