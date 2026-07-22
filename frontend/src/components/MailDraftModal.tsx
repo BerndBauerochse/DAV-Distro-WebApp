@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Mail, X, Paperclip, ExternalLink, Loader2, Send, Check } from 'lucide-react'
+import { Mail, X, Paperclip, ExternalLink, Loader2, Send, Check, Highlighter } from 'lucide-react'
 import { getStoredAuth } from '../hooks/useAuth'
 import { api } from '../api/client'
 import type { MailDraft } from '../types'
@@ -79,6 +79,41 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
 
   function currentBody(): string {
     return draft.is_html ? (htmlBodyRef.current?.innerHTML ?? draft.body) : textBody
+  }
+
+  // Färbt die Tabellenzeile am Cursor grün (bzw. hebt die Färbung wieder auf).
+  // Grünton mit dunkler Schrift — in Outlook gut lesbar und druckbar.
+  const GREEN_BG = '#c6efce'
+  const GREEN_FG = '#006100'
+  function toggleRowGreen() {
+    const editor = htmlBodyRef.current
+    const sel = window.getSelection()
+    if (!editor || !sel || sel.rangeCount === 0) return
+
+    // Vom Cursor aus die umgebende <tr> im Editor suchen
+    let node: Node | null = sel.anchorNode
+    let tr: HTMLElement | null = null
+    while (node && node !== editor) {
+      if (node instanceof HTMLElement && node.tagName === 'TR') { tr = node; break }
+      node = node.parentNode
+    }
+    if (!tr) return  // Cursor steht nicht in einer Tabellenzeile
+
+    const cells = Array.from(tr.querySelectorAll('td')) as HTMLElement[]
+    if (cells.length === 0) return
+    const isGreen = tr.dataset.green === '1'
+    cells.forEach(td => {
+      if (isGreen) {
+        td.style.backgroundColor = td.dataset.origBg ?? ''
+        td.style.color = td.dataset.origColor ?? ''
+      } else {
+        if (td.dataset.origBg === undefined) td.dataset.origBg = td.style.backgroundColor
+        if (td.dataset.origColor === undefined) td.dataset.origColor = td.style.color
+        td.style.backgroundColor = GREEN_BG
+        td.style.color = GREEN_FG
+      }
+    })
+    tr.dataset.green = isGreen ? '0' : '1'
   }
 
   const sendDisabled = !to.trim() || !subject.trim()
@@ -250,11 +285,25 @@ export function MailDraftModal({ runId, draft, portalName, queueCount = 1, onClo
 
           {/* Inhalt — bearbeitbar (HTML direkt im gerenderten Zustand) */}
           <div className="space-y-1">
-            <p className="text-xs" style={{ color: 'var(--text-300)' }}>Inhalt (bearbeitbar)</p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs" style={{ color: 'var(--text-300)' }}>Inhalt (bearbeitbar)</p>
+              {draft.is_html && (
+                <button type="button" onMouseDown={e => e.preventDefault()} onClick={toggleRowGreen}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
+                  style={{ background: 'rgba(74,222,128,0.12)', border: '1px solid rgba(74,222,128,0.3)', color: '#4ade80' }}
+                  title="Cursor in die gewünschte Zeile setzen, dann klicken (nochmal klicken hebt die Färbung auf)">
+                  <Highlighter className="w-3.5 h-3.5" />
+                  Zeile grün
+                </button>
+              )}
+            </div>
             {draft.is_html ? (
+              // Weißer Hintergrund + dunkle Schrift: zeigt die Mail so, wie sie
+              // später in Outlook aussieht — im dunklen App-Fenster sonst unlesbar.
               <div ref={htmlBodyRef} contentEditable suppressContentEditableWarning
-                className="glass-input w-full text-sm max-h-48 overflow-y-auto"
-                style={{ color: 'var(--text-200)', minHeight: '6rem' }}
+                className="w-full text-sm max-h-64 overflow-auto rounded-xl p-3"
+                style={{ background: '#ffffff', color: '#000000', minHeight: '6rem',
+                         border: '1px solid var(--glass-border)' }}
                 dangerouslySetInnerHTML={{ __html: draft.body }} />
             ) : (
               <textarea value={textBody} onChange={e => setTextBody(e.target.value)}
