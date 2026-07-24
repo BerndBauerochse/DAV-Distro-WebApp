@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square, Play, Send } from 'lucide-react'
+import { Upload, Trash2, Download, FileArchive, FileText, File, Image, Database, Loader2, AlertCircle, CheckSquare, Square, Play, Send, Search, XCircle, X } from 'lucide-react'
 import { api } from '../api/client'
 import { useUpload } from '../contexts/UploadContext'
 import { getStoredAuth } from '../hooks/useAuth'
@@ -76,6 +76,7 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'ean_asc' | 'ean_desc'>('newest')
   const [exchangeTargets, setExchangeTargets] = useState<Set<string>>(new Set())
+  const [coverSearch, setCoverSearch] = useState('')
   const { uploads, startUpload } = useUpload()
 
   const { data: files = [], isLoading, isError } = useQuery({
@@ -194,6 +195,23 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
     const eb = extractEan(b.name) ?? b.name
     return sortOrder === 'ean_asc' ? ea.localeCompare(eb) : eb.localeCompare(ea)
   })
+
+  // Cover-Suche: eine oder mehrere ISBNs (mit Komma/Leerzeichen getrennt).
+  // Ein Cover passt, wenn sein Dateiname eine der eingegebenen ISBNs enthält.
+  const searchTokens = coverSearch.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean)
+  const displayedFiles: FileEntry[] = searchTokens.length > 0
+    ? sortedFiles.filter(f => searchTokens.some(t => f.name.toLowerCase().includes(t.toLowerCase())))
+    : sortedFiles
+  const displayedAllSelected = displayedFiles.length > 0 && displayedFiles.every(f => selected.has(f.name))
+
+  function toggleAllDisplayed() {
+    setSelected(prev => {
+      const n = new Set(prev)
+      if (displayedAllSelected) displayedFiles.forEach(f => n.delete(f.name))
+      else displayedFiles.forEach(f => n.add(f.name))
+      return n
+    })
+  }
 
   const sortControls = (
     <div className="flex items-center gap-1">
@@ -371,15 +389,61 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
       {/* Cover grid */}
       {isCovers && files.length > 0 && (
         <div>
+          {/* Suche nach ISBN(s) — mehrere mit Komma trennen */}
+          <div className="mb-3">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                value={coverSearch}
+                onChange={e => setCoverSearch(e.target.value)}
+                placeholder="ISBN suchen – mehrere mit Komma trennen, z. B. 9783742442710, 9783742442727"
+                className="glass-input w-full text-sm"
+                style={{ paddingLeft: '2.25rem', paddingRight: coverSearch ? '2.25rem' : undefined }}
+              />
+              {coverSearch && (
+                <button onClick={() => setCoverSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
+                  style={{ color: 'var(--text-muted)' }}
+                  title="Suche leeren">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <button onClick={toggleAll} style={{ color: allSelected ? '#22d3ee' : 'var(--text-muted)' }}>
-              {allSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+            <button onClick={toggleAllDisplayed} style={{ color: displayedAllSelected ? '#22d3ee' : 'var(--text-muted)' }}>
+              {displayedAllSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
             </button>
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Alle auswählen</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {searchTokens.length > 0 ? 'Treffer auswählen' : 'Alle auswählen'}
+            </span>
+            {searchTokens.length > 0 && (
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                · {displayedFiles.length} von {files.length}
+              </span>
+            )}
+            {selected.size > 0 && (
+              <button onClick={() => setSelected(new Set())}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.1)' }}
+                title="Alle markierten Cover abwählen">
+                <XCircle className="w-3.5 h-3.5" />
+                Auswahl aufheben ({selected.size})
+              </button>
+            )}
             <div className="ml-auto">{sortControls}</div>
           </div>
+
+          {searchTokens.length > 0 && displayedFiles.length === 0 && (
+            <div className="text-sm text-center py-8" style={{ color: 'var(--text-muted)' }}>
+              Keine Cover für diese ISBN(s) gefunden
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {sortedFiles.map((f: FileEntry) => (
+            {displayedFiles.map((f: FileEntry) => (
               <div key={f.name}
                 className="relative group rounded-xl overflow-hidden cursor-pointer transition-all duration-150"
                 style={{
