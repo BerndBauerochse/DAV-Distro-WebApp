@@ -55,6 +55,7 @@ PORTAL_DISPLAY_NAMES = {
     "bookwire_moa": "Bookwire MoA",
     "bookbeat": "Bookbeat",
     "spotify": "Spotify",
+    "spotify_moa": "Spotify MoA",
     "google": "Google",
     "zebra": "Zebra",
     "rtl": "RTL+",

@@ -319,3 +319,92 @@ Dateisystem zugreifen; die Zwischenlösung (Datei-/Ordnerdialog) war nicht der
 gewünschte vollautomatische Import. BatchCard zeigt fehlende Dateien wieder
 nur als rotes X an. Für echte Automatik wäre ein Desktop-Watcher nötig
 (SFTP-Upload außerhalb des Browsers).
+
+---
+
+## Session 2026-06-22
+
+### Neuer Kanal: Storytel (Files.com SFTP)
+
+**Besonderheit:** Storytel liefert pro Titel einen kompletten Ordner.
+
+- **Eingang:** Eine ZIP voller `{EAN}.xml` (statt einzelner XML). Wird im
+  Dashboard hochgeladen, automatisch entpackt; jede XML gehört zu einer EAN.
+- **Pro Titel:** Master-`{EAN}.zip` entpacken → Ordner `{EAN}/` mit AUSSCHLIESSLICH
+  Cover (.jpg/.jpeg/.png), MP3 und der passenden `{EAN}.xml`.
+- **Ausschluss:** .pdf/.txt/.xlsx und sonstige Begleitdateien werden hart
+  herausgefiltert (Allowlist in `_enforce_allowlist`).
+- **Upload:** Die fertigen Titelordner per SFTP zu `storytelingestion.files.com`.
+
+**Dateien:**
+- `backend/app/modules/storytel.py` (neu, Muster wie Zebra: entpacken + Ordner-Upload, parallel mit Retries)
+- `backend/app/main.py`: Import `app.modules.storytel`
+- `delivery_service.py` `PORTAL_DISPLAY_NAMES`: `"storytel": "Storytel"`
+- `metadata_parser.py`: ZIP-Metadaten → Portal „storytel", EANs aus XML-Dateinamen
+- `BatchCard.tsx` `PORTAL_COLORS`: storytel
+- `config/portals.ini` (Server): `[Portal_Storytel]` mit Files.com-SFTP-Zugang
+
+**Erkennung:** Jede hochgeladene `.zip` wird als Storytel-Metadaten interpretiert.
+
+### Wichtiger Fix: ZIP-Quellordner für ALLE Kanäle
+
+**Problem entdeckt:** Der App-ZIPs-Tab und die Vorschau nutzten `/storage/zips`
+(host `/opt/dav-storage/zips`, 104 Master-ZIPs), die **Auslieferung** las aber aus
+`/data/source` (host `/opt/audiobook-storage/zips`, nur 4 Altdateien). Ergebnis:
+Vorschau grün, Auslieferung „keine Dateien gefunden".
+
+**Lösung:** In `config/portals.ini` (Server) alle `source_dir` von `/data/source`
+auf `/storage/zips` umgestellt — Upload, Vorschau und Auslieferung nutzen jetzt
+denselben Ordner. `config/portals.ini.example` entsprechend angepasst.
+
+---
+
+## Session 2026-08-24
+
+### Feature: Spotify MoA (Meldung ohne Assets)
+
+**Ziel:** Wie bei Audible und Bookwire kann jetzt auch an Spotify (Findaway) eine
+reine Metadaten- + Cover-Lieferung ohne Audiodaten geschickt werden — pro Titel
+in einem eigenen, nach ISBN benannten Ordner. Keine Mail.
+
+#### Backend (`backend/app/modules/spotify.py`)
+
+- `SpotifyModule` refaktoriert: `_resolve_metadata()` und `_metadata_transfer()`
+  als wiederverwendbare Helfer herausgezogen (Verhalten unverändert)
+- Neue Klasse `SpotifyMoAModule(SpotifyModule)`, registriert als `spotify_moa`:
+  - Pro EAN ein eigener Ordner `/{EAN}/` auf dem Findaway-SFTP
+  - Darin: die Metadatei (Kopie, gleiche Umbenennung wie Standard-Kanal:
+    `Spotify_Novis_DAV_onix3-` → `dav-onix3_`) **und** das Cover `{EAN}.jpg`
+    aus `STORAGE_DIR/covers` — beides zusammen im selben Ordner
+  - keine ZIPs, keine PDF-Injektion, kein Mail-Entwurf
+  - `check_missing()` prüft Cover statt ZIPs
+  - `ship()` legt jeden `/{EAN}/`-Ordner per `sftp_makedirs` an
+
+  Erste Fassung (verworfen) legte Metadatei ins Wurzelverzeichnis und Cover in
+  einen separaten `cover_remote_dir` — auf Kundenwunsch durch das
+  Pro-Titel-Ordner-Modell ersetzt (analog zum Muster von Audible Corr).
+
+#### Konfiguration (`config/portals.ini` + `.example`)
+
+Abschnitt `[Portal_Spotify_MoA]`. Zugangsdaten werden von `[Portal_Spotify]`
+geerbt, wenn sie dort nicht gesetzt sind. Kein `cover_remote_dir` mehr nötig —
+der Zielordner ergibt sich automatisch aus der EAN.
+
+#### Sichtbarkeit im Frontend
+
+- `metadata_parser.py`: `_PORTAL_VARIANTS["spotify"]` → Dropdown
+  „Standard" / „MoA (Cover)"
+- `delivery_service.py`: `"spotify_moa": "Spotify MoA"`
+- `BatchCard.tsx`: Farbe für `spotify_moa` (grün wie Spotify).
+  Die Cover-statt-ZIP-Anzeige greift automatisch über die `_moa`-Endung.
+- `History.tsx`: Label `Spotify MoA` ergänzt (dabei auch das fehlende
+  `Storytel`-Label nachgetragen)
+
+### Verifikation
+
+- `py_compile` für alle geänderten Python-Dateien erfolgreich
+- `npx tsc --noEmit` im Frontend ohne Fehler
+
+### Offen
+
+- `[Portal_Spotify_MoA]` auf dem Server in `config/portals.ini` eintragen (Passwort ist lokal bereits gesetzt)

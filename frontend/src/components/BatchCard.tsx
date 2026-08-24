@@ -11,6 +11,7 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
   bookwire_moa:    { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
   bookbeat:        { bg: 'rgba(167,139,250,0.15)', text: '#a78bfa' },
   spotify:         { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
+  spotify_moa:     { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
   google:          { bg: 'rgba(250,204,21,0.15)', text: '#facc15' },
   zebra:           { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.6)' },
   rtl:             { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },

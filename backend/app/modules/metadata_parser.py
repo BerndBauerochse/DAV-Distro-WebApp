@@ -63,6 +63,10 @@ _PORTAL_VARIANTS: dict[str, list[dict]] = {
         {"key": "bookwire",     "label": "Standard"},
         {"key": "bookwire_moa", "label": "MoA (Cover)"},
     ],
+    "spotify": [
+        {"key": "spotify",     "label": "Standard"},
+        {"key": "spotify_moa", "label": "MoA (Cover)"},
+    ],
 }
 
 _FORM_DETAIL_MAP = {

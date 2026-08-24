@@ -15,8 +15,9 @@ const PAGE_SIZE = 20
 const PORTAL_DISPLAY: Record<string, string> = {
   audible: 'Audible', audible_moa: 'Audible MoA', audible_fulfill: 'Audible Fulfill',
   audible_corr: 'Audible Corr', bookwire: 'Bookwire', bookwire_moa: 'Bookwire MoA',
-  bookbeat: 'Bookbeat', spotify: 'Spotify', google: 'Google', zebra: 'Zebra',
-  rtl: 'RTL+', divibib: 'Divibib',
+  bookbeat: 'Bookbeat', spotify: 'Spotify', spotify_moa: 'Spotify MoA',
+  google: 'Google', zebra: 'Zebra',
+  rtl: 'RTL+', divibib: 'Divibib', storytel: 'Storytel',
 }
 
 interface HistoryProps {

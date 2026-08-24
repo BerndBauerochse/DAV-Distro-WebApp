@@ -107,6 +107,17 @@ sftp_password = DEIN_PASSWORT
 export_dir = /data/export/spotify
 source_dir = /storage/zips
 
+[Portal_Spotify_MoA]
+; Meldung ohne Assets: pro Titel ein Ordner /{EAN}/ mit Metadatei + Cover, keine ZIPs, keine Mail.
+; Zugangsdaten werden von [Portal_Spotify] geerbt, wenn hier nicht gesetzt.
+type = sftp
+sftp_host = sftp.findaway.com
+sftp_port = 2222
+sftp_username = deraudioverlagdig
+sftp_password = DEIN_PASSWORT
+export_dir = /data/export/spotify
+covers_dir = /storage/covers
+
 [Portal_Storytel]
 type = sftp
 sftp_host = STORYTEL_FILES_COM_HOST
