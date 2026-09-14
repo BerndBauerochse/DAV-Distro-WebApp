@@ -340,7 +340,6 @@ class AudibleModule(BasePortalModule):
                 "to": self._get(sec, "takedown_mail_to", "Bauerochse@der-audio-verlag.de"),
                 "bcc": self._get(
                     sec, "takedown_mail_bcc",
-                    "content-operations-audiobook@zebralution.com; "
                     "eu-delivery@audible.de; kurzke@audible.de",
                 ),
                 "subject": "Der Audio Verlag - Takedown",
