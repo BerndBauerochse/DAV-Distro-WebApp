@@ -68,7 +68,7 @@ function AuthImage({ filename, alt, className }: { filename: string; alt: string
   )
 }
 
-function CategoryPanel({ category, catalog, onUseForDelivery }: { category: typeof CATEGORIES[number]; catalog: CatalogMap; onUseForDelivery?: (filename: string) => void }) {
+function CategoryPanel({ category, catalog, onUseForDelivery }: { category: typeof CATEGORIES[number]; catalog: CatalogMap; onUseForDelivery?: (filenames: string | string[]) => void }) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
@@ -321,6 +321,27 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
           </button>
         )}
       </div>
+
+      {/* Metadaten — mehrere ausgewählte Metadateien ins Dashboard zur Verarbeitung schicken */}
+      {category.key === 'metadata' && selected.size > 0 && onUseForDelivery && (
+        <div className="rounded-xl p-3"
+          style={{ background: 'rgba(109,40,217,0.06)', border: '1px solid rgba(109,40,217,0.25)' }}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="section-label">Ins Dashboard übernehmen</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Alle ausgewählten Metadateien werden im Dashboard zur Auslieferung vorbereitet
+            </span>
+            <button
+              onClick={() => { onUseForDelivery([...selected]); setSelected(new Set()) }}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors"
+              style={{ background: '#6d28d9', color: '#ffffff', border: '1px solid #7c3aed' }}
+            >
+              <Play className="w-3 h-3" />
+              {selected.size} ins Dashboard senden
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* TOC-Update — ausgewählte TOCs in die {ISBN}_corr-Ordner bei Audible laden */}
       {category.key === 'toc' && selected.size > 0 && (
@@ -595,7 +616,7 @@ function CategoryPanel({ category, catalog, onUseForDelivery }: { category: type
 }
 
 export function FileManager({ onUseForDelivery, activeTab = 'zips', onTabChange }: {
-  onUseForDelivery?: (filename: string) => void
+  onUseForDelivery?: (filenames: string | string[]) => void
   activeTab?: FileCategory
   onTabChange?: (tab: FileCategory) => void
 }) {

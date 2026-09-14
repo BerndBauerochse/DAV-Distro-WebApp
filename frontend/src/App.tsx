@@ -101,7 +101,7 @@ export function App() {
   const [page, setPage] = useState<Page>('dashboard')
   const [fileTab, setFileTab] = useState<FileCategory>('zips')
   const { avatar, set: setAvatar } = useAvatar(auth.username)
-  // Queue statt Einzel-Overlay: mehrere Mail-Entwürfe (z.B. Audible + Zebra)
+  // Queue statt Einzel-Overlay: mehrere Mail-Entwürfe (z.B. Audible + Bookwire)
   // können gleichzeitig anstehen, ohne sich gegenseitig zu überschreiben.
   const [mailQueue, setMailQueue] = useState<{ runId: string; draft: MailDraft; portalName: string }[]>([])
   const batchBuilderRef = useRef<BatchBuilderHandle>(null)
@@ -118,9 +118,10 @@ export function App() {
     setMailQueue(prev => prev.slice(1))
   }, [])
 
-  const handleUseForDelivery = useCallback((filename: string) => {
+  const handleUseForDelivery = useCallback((filenames: string | string[]) => {
+    const list = Array.isArray(filenames) ? filenames : [filenames]
     setPage('dashboard')
-    setTimeout(() => batchBuilderRef.current?.addServerFile(filename), 50)
+    setTimeout(() => list.forEach(fn => batchBuilderRef.current?.addServerFile(fn)), 50)
   }, [])
 
   const avatarRef = useRef<HTMLInputElement>(null)
