@@ -1,6 +1,6 @@
 """Cover-Austausch: ausgewählte Cover an die Cover_Austausch-Ordner
 ausgewählter Portale (SFTP/FTPS/FTP) hochladen, in der Historie protokollieren
-und für Audible/Zebra einen Mail-Entwurf erzeugen."""
+und für Audible einen Mail-Entwurf erzeugen."""
 import logging
 import os
 import uuid
@@ -74,28 +74,6 @@ def _audible_mail(module, ean: str, title: str, user: str | None) -> dict:
             f"Please replace the image for this audiobook with the new image on: "
             f"{module.cover_exchange_mail_path.rstrip('/')}/{ean}.jpg"
         ),
-        "is_html": False,
-    }
-
-
-def _zebra_mail(module, filenames: list[str], user: str | None) -> dict:
-    name = user.capitalize() if user else "Bernd"
-    cover_dir = (module.cover_exchange_dir or "/").rstrip("/") or "/"
-    sftp_url = f"sftp://{module.username}@{module.host}:{module.port}{cover_dir}"
-    namen = "\n".join(filenames)
-    body = (
-        "Lieber Andreas,\n"
-        "Hier eine Liste von Covern von denen ich dich bitten möchte sie auszutauschen.\n"
-        "Ich habe sie alle bei euch auf dem Server in diesen Ordner abgelegt:\n"
-        f"{sftp_url}\n\n"
-        f"Name\n{namen}\n\n"
-        "Ich danke dir.\n"
-        f"Liebe Grüße\n{name}"
-    )
-    return {
-        "to": "content-operations-audiobook@zebralution.com",
-        "subject": "Cover Austausch",
-        "body": body,
         "is_html": False,
     }
 
@@ -185,8 +163,6 @@ async def exchange_covers(req: ExchangeRequest, user: str = Depends(get_current_
         for fname, status, error in res:
             results.append({"portal": key, "filename": fname, "status": status, "error": error})
 
-        ok_files = [fname for fname, status, _ in res if status == "success"]
-
         # Historie + Mail
         entries = [(fname, _ean_of(fname), status, error) for fname, status, error in res]
         if key == "audible":
@@ -194,9 +170,6 @@ async def exchange_covers(req: ExchangeRequest, user: str = Depends(get_current_
             for fname, ean, status, error in entries:
                 mail = _audible_mail(module, ean, titles.get(ean, ""), user) if status == "success" else None
                 await record_exchange_run(key, user, [(fname, ean, status, error)], mail)
-        elif key == "zebra":
-            mail = _zebra_mail(module, ok_files, user) if ok_files else None
-            await record_exchange_run(key, user, entries, mail)
         else:
             await record_exchange_run(key, user, entries, None)
 

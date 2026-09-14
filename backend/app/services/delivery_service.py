@@ -57,7 +57,6 @@ PORTAL_DISPLAY_NAMES = {
     "spotify": "Spotify",
     "spotify_moa": "Spotify MoA",
     "google": "Google",
-    "zebra": "Zebra",
     "rtl": "RTL+",
     "divibib": "Divibib",
     "storytel": "Storytel",

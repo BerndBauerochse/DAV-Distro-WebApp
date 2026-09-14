@@ -16,7 +16,7 @@ const PORTAL_DISPLAY: Record<string, string> = {
   audible: 'Audible', audible_moa: 'Audible MoA', audible_fulfill: 'Audible Fulfill',
   audible_corr: 'Audible Corr', bookwire: 'Bookwire', bookwire_moa: 'Bookwire MoA',
   bookbeat: 'Bookbeat', spotify: 'Spotify', spotify_moa: 'Spotify MoA',
-  google: 'Google', zebra: 'Zebra',
+  google: 'Google',
   rtl: 'RTL+', divibib: 'Divibib', storytel: 'Storytel',
 }
 

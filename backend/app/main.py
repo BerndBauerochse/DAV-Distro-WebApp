@@ -26,7 +26,6 @@ import app.modules.bookwire     # noqa: F401
 import app.modules.bookbeat     # noqa: F401
 import app.modules.spotify      # noqa: F401
 import app.modules.google       # noqa: F401
-import app.modules.zebra        # noqa: F401
 import app.modules.rtl          # noqa: F401
 import app.modules.divibib      # noqa: F401
 import app.modules.storytel     # noqa: F401

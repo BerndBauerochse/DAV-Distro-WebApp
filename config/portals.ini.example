@@ -59,18 +59,6 @@ remote_dir_xml = /xml
 export_dir = /data/export/bookwire
 source_dir = /storage/zips
 
-[Portal_Zebra]
-cover_exchange_dir = /Cover_Austausch
-type = sftp
-sftp_host = ftp.media-ems.com
-sftp_port = 2201
-sftp_username = DAV
-sftp_password_base64 = HIER_BASE64_PASSWORT
-remote_dir = /
-remote_metadata_dir = /Metadaten
-export_dir = /data/export/zebra
-source_dir = /storage/zips
-
 [Portal_RTL+]
 type = sftp
 sftp_host = ftp-audiobooks.now-plus-prod.aws-cbc.cloud

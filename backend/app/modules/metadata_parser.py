@@ -5,7 +5,6 @@ und prüft ZIP-Verfügbarkeit auf dem Server.
 Unterstützte Formate:
   ONIX 3 XML  — Bookwire, Bookbeat, Google, RTL, Spotify, Divibib
   Audible     — Excel (.xlsx)
-  Zebra       — Excel (.xlsx, header-Zeile 6 / Index 5)
 """
 from __future__ import annotations
 
@@ -45,7 +44,6 @@ _PREFIX_MAP = {
     "audible":   "audible",
     "bookbeat":  "bookbeat",
     "bookwire":  "bookwire",
-    "zebra":     "zebra",
     "google":    "google",
     "rtl":       "rtl",
     "spotify":   "spotify",
@@ -111,10 +109,7 @@ def parse_metadata(file_path: str, filename: str, source_dir: str, covers_dir: s
     if lower.endswith(".xml"):
         books = _parse_onix_xml(file_path, source_dir, covers_dir)
     elif lower.endswith(".xlsx") or lower.endswith(".xls"):
-        if portal == "zebra":
-            books = _parse_zebra_excel(file_path, source_dir, covers_dir)
-        else:
-            books = _parse_audible_excel(file_path, source_dir, covers_dir)
+        books = _parse_audible_excel(file_path, source_dir, covers_dir)
     else:
         books = []
 
@@ -268,41 +263,4 @@ def _parse_audible_excel(file_path: str, source_dir: str, covers_dir: str = "") 
             ))
     except Exception as e:
         logger.error(f"Audible Excel parse error: {e}")
-    return books
-
-
-# ---------------------------------------------------------------------------
-# Zebra Excel
-# ---------------------------------------------------------------------------
-
-def _parse_zebra_excel(file_path: str, source_dir: str, covers_dir: str = "") -> list[BookInfo]:
-    import pandas as pd
-    books: list[BookInfo] = []
-    try:
-        df = pd.read_excel(file_path, header=5, dtype=str)
-        for _, row in df.iterrows():
-            raw_ean = str(row.get("AlbumEAN_UPC", "")).strip()
-            if not raw_ean or raw_ean == "nan":
-                continue
-            try:
-                ean = str(int(float(raw_ean)))
-            except (ValueError, TypeError):
-                ean = raw_ean
-            title  = str(row.get("AlbumTitle_SeriesTitle", "")).strip()
-            author = str(row.get("InfoAuthors", "")).strip()
-            raw_ab = str(row.get("InfoMediaVariant", "")).strip().lower()
-            if "ungekürzt" in raw_ab or "ungek\u00fcrzt" in raw_ab or "unabridged" in raw_ab:
-                abridged = False
-            elif "gekürzt" in raw_ab or "gek\u00fcrzt" in raw_ab or "abridged" in raw_ab:
-                abridged = True
-            else:
-                abridged = None
-            zip_available = os.path.isfile(os.path.join(source_dir, f"{ean}.zip"))
-            cover_available = bool(covers_dir and os.path.isfile(os.path.join(covers_dir, f"{ean}.jpg")))
-            books.append(BookInfo(
-                ean=ean, title=title, author=author,
-                abridged=abridged, zip_available=zip_available, cover_available=cover_available,
-            ))
-    except Exception as e:
-        logger.error(f"Zebra Excel parse error: {e}")
     return books

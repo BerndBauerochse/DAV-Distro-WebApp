@@ -13,7 +13,6 @@ const PORTAL_COLORS: Record<string, { bg: string; text: string }> = {
   spotify:         { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
   spotify_moa:     { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
   google:          { bg: 'rgba(250,204,21,0.15)', text: '#facc15' },
-  zebra:           { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.6)' },
   rtl:             { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
   divibib:         { bg: 'rgba(34,211,238,0.15)', text: '#22d3ee' },
   storytel:        { bg: 'rgba(244,114,182,0.15)', text: '#f472b6' },

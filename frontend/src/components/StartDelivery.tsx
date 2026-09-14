@@ -18,7 +18,6 @@ const PREFIX_TO_PORTAL: Record<string, string> = {
   google:   'google',
   rtl:      'rtl',
   spotify:  'spotify',
-  zebra:    'zebra',
 }
 
 function detectPortal(filename: string): string | null {
