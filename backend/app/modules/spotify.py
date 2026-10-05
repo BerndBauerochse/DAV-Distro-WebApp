@@ -2,6 +2,7 @@
 import glob
 import logging
 import os
+import re
 import shutil
 
 from app.modules.base import BasePortalModule, FileTransfer, ProgressCallback
@@ -33,14 +34,28 @@ class SpotifyModule(BasePortalModule):
                 glob.glob(os.path.join(self.export_dir, "*.xlsx"))
         return files[0] if files else None
 
+    @staticmethod
+    def _strip_update_token(name: str) -> str:
+        """Entfernt ein 'Update'-Wort samt EINEM angrenzenden Trennzeichen (-, _, Leer)
+        aus dem Dateinamen, case-insensitive — ohne die strukturellen Trenner zu
+        zerstören. 'onix3-Update-123.xml' -> 'onix3-123.xml'."""
+        out = re.sub(r"(?i)update[-_ ]", "", name, count=1)
+        if out == name:  # kein Trenner dahinter → Trenner davor entfernen
+            out = re.sub(r"(?i)[-_ ]update", "", name, count=1)
+        return out
+
+    def _remote_metadata_name(self, meta: str) -> str:
+        """Findaway-Dateiname: 'Update' entfernen, damit eine Update-Datei exakt
+        so heißt wie eine normale Lieferung, dann Präfix-Umbenennung."""
+        name = self._strip_update_token(os.path.basename(meta))
+        return name.replace("Spotify_Novis_DAV_onix3-", "dav-onix3_")
+
     def _metadata_transfer(self, meta: str) -> FileTransfer:
         """Metadatei-Transfer ins Wurzelverzeichnis, mit Findaway-Umbenennung."""
-        local_name = os.path.basename(meta)
-        remote_name = local_name.replace("Spotify_Novis_DAV_onix3-", "dav-onix3_")
         return FileTransfer(
-            ean=None, file_name=local_name,
+            ean=None, file_name=os.path.basename(meta),
             file_type="metadata", source_path=meta,
-            destination=f"/{remote_name}",
+            destination=f"/{self._remote_metadata_name(meta)}",
             file_size_bytes=os.path.getsize(meta),
         )
 
@@ -153,8 +168,8 @@ class SpotifyMoAModule(SpotifyModule):
             logger.error("Spotify MoA: Keine Metadatei gefunden.")
             return transfers
 
-        # Gleiche Umbenennung wie beim Standard-Kanal (Spotify_Novis_DAV_onix3- -> dav-onix3_)
-        meta_filename = os.path.basename(meta).replace("Spotify_Novis_DAV_onix3-", "dav-onix3_")
+        # Gleiche Umbenennung wie beim Standard-Kanal (inkl. 'Update' entfernen)
+        meta_filename = self._remote_metadata_name(meta)
 
         for ean in self._extract_eans(meta):
             transfers.append(FileTransfer(

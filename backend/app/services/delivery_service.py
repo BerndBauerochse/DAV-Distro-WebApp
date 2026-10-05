@@ -187,13 +187,18 @@ def _run_delivery_sync(db_session_factory, loop, run_id, portal_key, metadata_pa
 
     module = module_cls(config, portal_key)
     module.update_field = update_field if takedown else None
+    # Automatik: Steht "update" im Dateinamen der Metadatei, wird der Lauf wie ein
+    # Update behandelt (nur Metadatei senden, keine ZIPs/Cover) — auch ohne den
+    # manuellen Update-Schalter.
+    meta_name = os.path.basename(metadata_path).lower() if metadata_path else ""
+    is_update = takedown or ("update" in meta_name)
     log_records: list[dict] = []
     completed = failed = skipped = 0
     total = 0
 
     try:
         transfers = module.get_files(str(run_id), metadata_path)
-        if takedown:
+        if is_update:
             transfers = [t for t in transfers if t.file_type == "metadata"]
 
         # Integritätsprüfung: unvollständig übertragene/beschädigte ZIPs
