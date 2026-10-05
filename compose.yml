@@ -53,8 +53,10 @@ services:
       - SERVICE_FQDN_FRONTEND_80
 
   # ── SFTP-Upload-Server ───────────────────────────────────────────────────────
-  # Zugang per SSH-Key (kein Passwort):
-  #   sftp -i ~/.ssh/id_rsa dav-upload@<host> -p 2222
+  # Zugang per SSH-Key ODER Passwort:
+  #   Key:      sftp -i ~/.ssh/id_rsa dav-upload@<host> -p 2222
+  #   Passwort: wird über die Env-Variable SFTP_PASSWORD gesetzt (Coolify).
+  #             Ohne SFTP_PASSWORD bleibt es reiner Key-Zugang.
   # Verzeichnisse im SFTP:
   #   /zips     → SOURCE_DIR  (Audiobook-ZIPs)
   #   /storage  → STORAGE_DIR (toc/, covers/, pdf/ …)
@@ -68,7 +70,7 @@ services:
       - /opt/audiobook-storage/zips:/home/dav-upload/zips
       - /opt/dav-storage:/home/dav-upload/storage
       - ./config/sftp_authorized_keys:/home/dav-upload/.ssh/authorized_keys:ro
-    command: "dav-upload::1000"
+    command: "dav-upload:${SFTP_PASSWORD:-}:1000"
 
 volumes:
   postgres_data:
