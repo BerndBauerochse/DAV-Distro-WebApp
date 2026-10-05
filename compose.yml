@@ -57,9 +57,10 @@ services:
   #   Key:      sftp -i ~/.ssh/id_rsa dav-upload@<host> -p 2222
   #   Passwort: wird über die Env-Variable SFTP_PASSWORD gesetzt (Coolify).
   #             Ohne SFTP_PASSWORD bleibt es reiner Key-Zugang.
-  # Verzeichnisse im SFTP:
-  #   /zips     → SOURCE_DIR  (Audiobook-ZIPs)
-  #   /storage  → STORAGE_DIR (toc/, covers/, pdf/ …)
+  # Verzeichnisse im SFTP — die App nutzt /storage:
+  #   /storage/zips   → ZIPs (Quelle für die Auslieferung) ← hier ZIPs hochladen
+  #   /storage/toc, /storage/covers, /storage/pdf, /storage/metadata
+  #   /zips           → Altpfad (/opt/audiobook-storage/zips), von der App NICHT genutzt
   # SSH Public Key eintragen in: config/sftp_authorized_keys
   sftp:
     image: atmoz/sftp:latest
