@@ -34,6 +34,13 @@ services:
       # und umgekehrt). Leer = kein automatisches CC.
       USER_BERND_EMAIL: ${USER_BERND_EMAIL:-}
       USER_DORO_EMAIL: ${USER_DORO_EMAIL:-}
+      # Bookwire-Zugang. Gesetzte Werte haben Vorrang vor config/portals.ini,
+      # leer = Wert aus portals.ini. Port 22 → SFTP, Port 21 → FTPS.
+      PORTAL_BOOKWIRE_SFTP_HOST: ${PORTAL_BOOKWIRE_SFTP_HOST:-}
+      PORTAL_BOOKWIRE_SFTP_PORT: ${PORTAL_BOOKWIRE_SFTP_PORT:-}
+      PORTAL_BOOKWIRE_SFTP_USERNAME: ${PORTAL_BOOKWIRE_SFTP_USERNAME:-}
+      PORTAL_BOOKWIRE_SFTP_PASSWORD: ${PORTAL_BOOKWIRE_SFTP_PASSWORD:-}
+      PORTAL_BOOKWIRE_PROTOCOL: ${PORTAL_BOOKWIRE_PROTOCOL:-}
     volumes:
       - ./config:/app/config:ro
       - uploads:/app/uploads

@@ -5,6 +5,7 @@ Progress is reported via the progress_callback.
 """
 import logging
 import os
+import re
 import zipfile
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -199,4 +200,11 @@ class BasePortalModule(ABC):
         return results
 
     def _get(self, section: str, key: str, fallback: str = "") -> str:
+        # Umgebungsvariable hat Vorrang vor portals.ini, damit Zugangsdaten in
+        # Coolify gepflegt werden können: [Portal_Bookwire] sftp_password →
+        # PORTAL_BOOKWIRE_SFTP_PASSWORD. Leere Werte zählen als nicht gesetzt.
+        env_key = re.sub(r"[^A-Z0-9]+", "_", f"{section}_{key}".upper()).strip("_")
+        env_value = os.getenv(env_key, "").strip()
+        if env_value:
+            return env_value
         return self.config.get(section, key, fallback=fallback)

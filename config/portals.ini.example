@@ -49,11 +49,13 @@ export_dir = /data/export/google
 source_dir = /storage/zips
 
 [Portal_Bookwire]
+; protocol = sftp (neuer Zugang, Port 22) | ftps (alter Zugang, Port 21, Benutzer DerAudioVerlag)
+protocol = sftp
 type = sftp
 sftp_host = ftp.bookwire.de
 sftp_port = 22
-sftp_username = DerAudioVerlag
-sftp_password_base64 = HIER_BASE64_PASSWORT
+sftp_username = dav
+sftp_password = DEIN_PASSWORT
 remote_dir = /assets
 remote_dir_xml = /xml
 export_dir = /data/export/bookwire

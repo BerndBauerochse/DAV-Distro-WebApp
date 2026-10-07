@@ -1,6 +1,7 @@
 """
 Bookwire portal module.
-Reads ONIX XML, finds matching ZIPs in source_dir, uploads via SFTP.
+Reads ONIX XML, finds matching ZIPs in source_dir, uploads via SFTP or FTPS
+(umschaltbar über `protocol` in [Portal_Bookwire]).
 """
 import base64
 import glob
@@ -12,7 +13,9 @@ import zipfile
 from lxml import etree
 
 from app.modules.base import BasePortalModule, FileTransfer, ProgressCallback
-from app.modules.ftp_helper import ftps_connection, ftp_upload
+from app.modules.ftp_helper import (
+    ftps_connection, ftp_upload, sftp_connection, sftp_makedirs, sftp_upload,
+)
 from app.services.delivery_service import register_portal
 
 logger = logging.getLogger(__name__)
@@ -27,13 +30,18 @@ class BookwireModule(BasePortalModule):
         self.export_dir = self._get(sec, "export_dir", "/data/export/bookwire")
         self.source_dir = self._get(sec, "source_dir", "/data/source")
         self.sftp_host = self._get(sec, "sftp_host", "ftp.bookwire.de")
-        self.sftp_port = config.getint(sec, "sftp_port", fallback=22)
+        self.sftp_port = int(self._get(sec, "sftp_port", "22"))
         self.sftp_username = self._get(sec, "sftp_username", "DerAudioVerlag")
         pw = self._get(sec, "sftp_password")
         if not pw:
             pw_b64 = self._get(sec, "sftp_password_base64")
             pw = base64.b64decode(pw_b64).decode() if pw_b64 else ""
         self.sftp_password = pw
+        # "sftp" (neuer Zugang, Port 22) oder "ftps" (alter Zugang, FTP mit
+        # explizitem TLS, Port 21). Ohne Angabe entscheidet der Port.
+        self.protocol = self._get(
+            sec, "protocol", "sftp" if self.sftp_port == 22 else "ftps"
+        ).strip().lower()
         self.remote_dir = self._get(sec, "remote_dir", "/assets")
         self.remote_dir_xml = self._get(sec, "remote_dir_xml", "/xml")
         self.pdf_dir = os.path.join(os.getenv("STORAGE_DIR", "/storage"), "pdf")
@@ -95,6 +103,31 @@ class BookwireModule(BasePortalModule):
         return transfers
 
     def ship(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
+        if self.protocol == "sftp":
+            self._ship_sftp(run_id, transfers, progress_cb)
+        else:
+            self._ship_ftps(run_id, transfers, progress_cb)
+
+    def _ship_sftp(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
+        with sftp_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as sftp:
+            for t in transfers:
+                try:
+                    progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "uploading")
+                    sftp_makedirs(sftp, os.path.dirname(t.destination))
+                    sftp_upload(
+                        sftp, t.source_path, t.destination,
+                        progress_cb=lambda cur, tot: progress_cb(
+                            run_id, t.ean, t.file_name, t.file_type, cur, tot, "uploading"
+                        ),
+                    )
+                    progress_cb(run_id, t.ean, t.file_name, t.file_type, t.file_size_bytes, t.file_size_bytes, "success")
+                    logger.info(f"Bookwire: Uploaded {t.file_name} (SFTP)")
+
+                except Exception as e:
+                    logger.error(f"Bookwire: Failed to upload {t.file_name}: {e}")
+                    progress_cb(run_id, t.ean, t.file_name, t.file_type, 0, t.file_size_bytes, "failed", str(e))
+
+    def _ship_ftps(self, run_id: str, transfers: list[FileTransfer], progress_cb: ProgressCallback) -> None:
         import ftplib
         with ftps_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as ftp:
             for t in transfers:
@@ -153,10 +186,22 @@ class BookwireModule(BasePortalModule):
         return bool(self.sftp_host and self.sftp_username)
 
     def exchange_covers(self, cover_paths: list[str]) -> list[tuple[str, str, str | None]]:
-        """Bookwire nutzt FTPS — Cover in den Cover-Austausch-Ordner bzw. remote_dir."""
+        """Cover in den Cover-Austausch-Ordner bzw. remote_dir (SFTP oder FTPS)."""
         import ftplib
         remote_dir = (self.cover_exchange_dir or self.remote_dir or "/").rstrip("/") or "/"
         results: list[tuple[str, str, str | None]] = []
+        if self.protocol == "sftp":
+            with sftp_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as sftp:
+                if remote_dir != "/":
+                    sftp_makedirs(sftp, remote_dir)
+                for path in cover_paths:
+                    fname = os.path.basename(path)
+                    try:
+                        sftp_upload(sftp, path, f"{remote_dir.rstrip('/')}/{fname}")
+                        results.append((fname, "success", None))
+                    except Exception as e:
+                        results.append((fname, "failed", str(e)))
+            return results
         with ftps_connection(self.sftp_host, self.sftp_port, self.sftp_username, self.sftp_password) as ftp:
             if remote_dir != "/":
                 try:
