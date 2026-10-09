@@ -58,7 +58,9 @@ export function BatchCard({ preview, onStart, onRemove, isStarting }: Props) {
   const [selectedPortal, setSelectedPortal] = useState(
     preview.portal_variants[0]?.key ?? preview.detected_portal
   )
-  const [takedown, setTakedown] = useState(false)
+  // Enthält der Dateiname "update", wird der Update-Modus automatisch vorausgewählt
+  // (passend zur Backend-Automatik). Manuell weiterhin umschaltbar.
+  const [takedown, setTakedown] = useState(/update/i.test(preview.filename))
   const [updateField, setUpdateField] = useState<string>(AUDIBLE_UPDATE_FIELDS[0])
 
   const isMoA        = selectedPortal.endsWith('_moa')
